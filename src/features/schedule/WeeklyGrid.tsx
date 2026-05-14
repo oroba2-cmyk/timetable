@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core'
 import { GridCell } from './GridCell'
 import { moveScheduleEntry } from './actions'
@@ -36,6 +36,10 @@ export function WeeklyGrid({ weekDates, periods, entries, roomFilter }: Props) {
   const [localEntries, setLocalEntries] = useState(entries)
   const [pending, setPending] = useState(false)
 
+  useEffect(() => {
+    setLocalEntries(entries)
+  }, [entries])
+
   const filteredEntries = roomFilter
     ? localEntries.filter(e => e.roomId === roomFilter)
     : localEntries
@@ -61,32 +65,37 @@ export function WeeklyGrid({ weekDates, periods, entries, roomFilter }: Props) {
     if (!newDate || !newPeriodId) return
 
     setPending(true)
-    const result = await moveScheduleEntry(entryId, newDate, newPeriodId)
+    try {
+      const result = await moveScheduleEntry(entryId, newDate, newPeriodId)
 
-    if (!result.success) {
-      const confirmed = window.confirm(`충돌이 감지되었습니다. 강제로 이동하시겠습니까?\n${result.error}`)
-      if (confirmed) {
-        const forced = await moveScheduleEntry(entryId, newDate, newPeriodId, true)
-        if (forced.success) {
-          setLocalEntries(prev =>
-            prev.map(e =>
-              e.id === entryId
-                ? { ...e, date: newDate, periodId: newPeriodId, status: forced.data.entry.status }
-                : e
+      if (!result.success) {
+        const confirmed = window.confirm(`충돌이 감지되었습니다. 강제로 이동하시겠습니까?\n${result.error}`)
+        if (confirmed) {
+          const forced = await moveScheduleEntry(entryId, newDate, newPeriodId, true)
+          if (forced.success) {
+            setLocalEntries(prev =>
+              prev.map(e =>
+                e.id === entryId
+                  ? { ...e, date: newDate, periodId: newPeriodId, status: forced.data.entry.status }
+                  : e
+              )
             )
-          )
+          }
         }
-      }
-    } else {
-      setLocalEntries(prev =>
-        prev.map(e =>
-          e.id === entryId
-            ? { ...e, date: newDate, periodId: newPeriodId, status: result.data.entry.status }
-            : e
+      } else {
+        setLocalEntries(prev =>
+          prev.map(e =>
+            e.id === entryId
+              ? { ...e, date: newDate, periodId: newPeriodId, status: result.data.entry.status }
+              : e
+          )
         )
-      )
+      }
+    } catch (err) {
+      console.error('moveScheduleEntry failed', err)
+    } finally {
+      setPending(false)
     }
-    setPending(false)
   }, [])
 
   const handleCancel = useCallback((_entryId: string) => {
