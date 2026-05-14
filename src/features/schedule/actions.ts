@@ -6,16 +6,9 @@ import { expandRule } from '@/engine/expander'
 import { checkConflict } from '@/engine/conflict'
 import { ScheduleEntry, ScheduleRule } from '@/generated/prisma'
 import { ActionResult } from '@/types'
+import { EntryLike } from '@/engine/conflict'
 
 const INCLUDE_RULE = {
-  room: true,
-  classGroup: { include: { grade: true } },
-  subject: true,
-  teacher: true,
-  period: true,
-} as const
-
-const INCLUDE_ENTRY = {
   room: true,
   classGroup: { include: { grade: true } },
   subject: true,
@@ -55,7 +48,7 @@ export async function listEntriesForWeek(termId: string, weekStart: string) {
         termId,
         date: { gte: start, lt: end },
       },
-      include: INCLUDE_ENTRY,
+      include: INCLUDE_RULE,
       orderBy: [{ date: 'asc' }, { period: { number: 'asc' } }],
     })
     return { success: true as const, data: entries }
@@ -88,10 +81,16 @@ export async function createScheduleRule(
   data: CreateScheduleRuleInput
 ): Promise<ActionResult<{ rule: ScheduleRule; created: number; conflicts: number }>> {
   try {
-    // 1. Find the term
-    const term = await prisma.schoolTerm.findUnique({ where: { id: data.termId } })
+    // 1. Find the term and validate the room before writing anything
+    const [term, room] = await Promise.all([
+      prisma.schoolTerm.findUnique({ where: { id: data.termId } }),
+      prisma.specialRoom.findUnique({ where: { id: data.roomId } }),
+    ])
     if (!term) {
       return { success: false, error: '학기를 찾을 수 없습니다.' }
+    }
+    if (!room) {
+      return { success: false, error: '특별실을 찾을 수 없습니다.' }
     }
 
     // 2. Create the ScheduleRule
@@ -133,16 +132,12 @@ export async function createScheduleRule(
       term.endDate
     )
 
-    // 5. Load room, existing entries, and room unavailabilities in parallel
-    const [room, existingEntries, roomUnavailabilities] = await Promise.all([
-      prisma.specialRoom.findUnique({ where: { id: data.roomId } }),
+    // 5. Load existing entries and room unavailabilities in parallel
+    const [existingEntriesRaw, roomUnavailabilities] = await Promise.all([
       prisma.scheduleEntry.findMany({ where: { termId: data.termId } }),
       prisma.roomUnavailability.findMany({ where: { roomId: data.roomId } }),
     ])
-
-    if (!room) {
-      return { success: false, error: '특별실을 찾을 수 없습니다.' }
-    }
+    const existingEntries: EntryLike[] = existingEntriesRaw
 
     // 6–8. For each date, check conflict and upsert entry
     let created = 0
@@ -190,6 +185,16 @@ export async function createScheduleRule(
           status,
         },
         update: { status },
+      })
+
+      existingEntries.push({
+        id: `new-${date.toISOString()}`,
+        date,
+        periodId: data.periodId,
+        roomId: data.roomId,
+        classId: data.classId,
+        teacherId: data.teacherId || null,
+        status,
       })
 
       if (conflictResult.hasConflict) {
@@ -295,11 +300,11 @@ export async function moveScheduleEntry(
 // ─────────────────────────────────────────────
 export async function deleteScheduleRule(ruleId: string): Promise<ActionResult> {
   try {
-    // 1. Delete all entries from this rule
-    await prisma.scheduleEntry.deleteMany({ where: { sourceRuleId: ruleId } })
-
-    // 2. Delete the rule
-    await prisma.scheduleRule.delete({ where: { id: ruleId } })
+    // 1 & 2. Delete entries then rule atomically
+    await prisma.$transaction(async (tx) => {
+      await tx.scheduleEntry.deleteMany({ where: { sourceRuleId: ruleId } })
+      await tx.scheduleRule.delete({ where: { id: ruleId } })
+    })
 
     // 3. Revalidate
     revalidatePath('/schedule')
