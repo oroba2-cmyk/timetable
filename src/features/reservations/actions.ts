@@ -124,21 +124,23 @@ export async function createReservation(data: {
 
 export async function deleteReservation(id: string): Promise<ActionResult> {
   try {
-    const reservation = await prisma.reservation.findUnique({ where: { id } })
+    await prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservation.findUnique({ where: { id } })
 
-    if (reservation) {
-      await prisma.scheduleEntry.deleteMany({
-        where: {
-          date: reservation.date,
-          periodId: reservation.periodId,
-          roomId: reservation.roomId,
-          classId: reservation.classId,
-          source: 'RESERVATION',
-        },
-      })
+      if (reservation) {
+        await tx.scheduleEntry.deleteMany({
+          where: {
+            date: reservation.date,
+            periodId: reservation.periodId,
+            roomId: reservation.roomId,
+            classId: reservation.classId,
+            source: 'RESERVATION',
+          },
+        })
+      }
 
-      await prisma.reservation.delete({ where: { id } })
-    }
+      await tx.reservation.delete({ where: { id } })
+    })
 
     revalidatePath('/calendar')
     revalidatePath('/list')
