@@ -26,14 +26,19 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
   const [endType, setEndType] = useState<'NONE' | 'DATE' | 'COUNT'>('NONE')
   const [selectedDays, setSelectedDays] = useState<number[]>([0])
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
 
   function toggleDay(day: number) {
-    setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    )
+    setSelectedDays((prev) => {
+      if (prev.includes(day) && prev.length === 1) return prev  // keep at least one
+      return prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    })
   }
 
   async function handleSubmit(fd: FormData) {
+    setError('')
+    setPending(true)
+
     const roomId = fd.get('roomId') as string
     const classId = fd.get('classId') as string
     const subjectId = (fd.get('subjectId') as string) || undefined
@@ -43,6 +48,18 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
     const repeatInterval = Number(fd.get('repeatInterval') ?? 1)
     const endDate = (fd.get('endDate') as string) || undefined
     const endCount = fd.get('endCount') ? Number(fd.get('endCount')) : undefined
+
+    if (repeatInterval < 1) {
+      setError('반복 주기는 1 이상이어야 합니다.')
+      setPending(false)
+      return
+    }
+
+    if (endType === 'DATE' && endDate && endDate <= startDate) {
+      setError('종료 날짜는 시작일보다 이후여야 합니다.')
+      setPending(false)
+      return
+    }
 
     const result = await createScheduleRule({
       termId,
@@ -70,16 +87,25 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
     } else {
       setError(result.error)
     }
+    setPending(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => {
+      if (!next) {
+        setRepeatUnit('WEEK')
+        setEndType('NONE')
+        setSelectedDays([0])
+        setError('')
+      }
+      setOpen(next)
+    }}>
       <DialogTrigger render={trigger as React.ReactElement} />
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>배정 규칙 추가</DialogTitle>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form key={open ? 'open' : 'closed'} action={handleSubmit} className="space-y-4">
           {/* Special Room */}
           <div>
             <Label>특별실</Label>
@@ -254,7 +280,7 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full" disabled={pending}>
             배정 규칙 추가
           </Button>
         </form>
