@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listPeriods, deletePeriod } from '@/features/periods/actions'
 import { listTerms } from '@/features/terms/actions'
 import { PeriodForm } from '@/features/periods/PeriodForm'

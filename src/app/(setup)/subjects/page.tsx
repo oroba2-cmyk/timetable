@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listSubjects } from '@/features/subjects/actions'
 import { listTerms } from '@/features/terms/actions'
 import { SubjectList } from '@/features/subjects/SubjectList'

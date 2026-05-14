@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listTeachers } from '@/features/teachers/actions'
 import { listSubjects } from '@/features/subjects/actions'
 import { listTerms } from '@/features/terms/actions'

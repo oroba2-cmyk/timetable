@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listTerms, createTerm, deleteTerm } from '@/features/terms/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

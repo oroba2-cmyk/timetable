@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listGrades, deleteClassGroup } from '@/features/classes/actions'
 import { listTeachers } from '@/features/teachers/actions'
 import { listTerms } from '@/features/terms/actions'

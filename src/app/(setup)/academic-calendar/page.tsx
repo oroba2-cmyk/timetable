@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listAcademicEvents, deleteAcademicEvent } from '@/features/academic-calendar/actions'
 import { listTerms } from '@/features/terms/actions'
 import { EventForm } from '@/features/academic-calendar/EventForm'

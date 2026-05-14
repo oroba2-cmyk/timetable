@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { listRooms } from '@/features/rooms/actions'
 import { listTerms } from '@/features/terms/actions'
 import { RoomList } from '@/features/rooms/RoomList'
