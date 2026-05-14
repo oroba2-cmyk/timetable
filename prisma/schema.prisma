@@ -1,13 +1,260 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model SchoolTerm {
+  id        String   @id @default(cuid())
+  year      Int
+  semester  Int
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  grades          Grade[]
+  specialRooms    SpecialRoom[]
+  periods         Period[]
+  academicEvents  AcademicEvent[]
+  scheduleRules   ScheduleRule[]
+  scheduleEntries ScheduleEntry[]
+  reservations    Reservation[]
+
+  @@unique([year, semester])
+}
+
+model Grade {
+  id      String     @id @default(cuid())
+  termId  String
+  term    SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  number  Int
+
+  classGroups ClassGroup[]
+
+  @@unique([termId, number])
+}
+
+model ClassGroup {
+  id                String   @id @default(cuid())
+  gradeId           String
+  grade             Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  number            Int
+  homeroomTeacherId String?
+  homeroomTeacher   Teacher? @relation("HomeroomClass", fields: [homeroomTeacherId], references: [id])
+
+  scheduleRules   ScheduleRule[]
+  scheduleEntries ScheduleEntry[]
+  reservations    Reservation[]
+
+  @@unique([gradeId, number])
+}
+
+model Subject {
+  id           String      @id @default(cuid())
+  termId       String
+  name         String
+  type         SubjectType @default(GENERAL)
+  requiresRoom Boolean     @default(false)
+
+  teacherSubjects TeacherSubject[]
+  scheduleRules   ScheduleRule[]
+  scheduleEntries ScheduleEntry[]
+  reservations    Reservation[]
+}
+
+enum SubjectType {
+  SPECIALIZED
+  GENERAL
+}
+
+model Teacher {
+  id     String      @id @default(cuid())
+  termId String
+  name   String
+  type   TeacherType @default(HOMEROOM)
+
+  teacherSubjects  TeacherSubject[]
+  unavailabilities TeacherUnavailability[]
+  homeroomClass    ClassGroup[]            @relation("HomeroomClass")
+  scheduleRules    ScheduleRule[]
+  scheduleEntries  ScheduleEntry[]
+  reservations     Reservation[]
+}
+
+enum TeacherType {
+  HOMEROOM
+  SPECIALIZED
+  CONCURRENT
+}
+
+model TeacherSubject {
+  id        String  @id @default(cuid())
+  teacherId String
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, subjectId])
+}
+
+model TeacherUnavailability {
+  id        String  @id @default(cuid())
+  teacherId String
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  periodId  String
+  period    Period  @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, dayOfWeek, periodId])
+}
+
+model SpecialRoom {
+  id       String     @id @default(cuid())
+  termId   String
+  term     SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  name     String
+  roomType String
+  capacity Int        @default(1)
+  note     String?
+
+  unavailabilities RoomUnavailability[]
+  scheduleRules    ScheduleRule[]
+  scheduleEntries  ScheduleEntry[]
+  reservations     Reservation[]
+}
+
+model RoomUnavailability {
+  id        String      @id @default(cuid())
+  roomId    String
+  room      SpecialRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  periodId  String
+  period    Period      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, dayOfWeek, periodId])
+}
+
+model Period {
+  id        String     @id @default(cuid())
+  termId    String
+  term      SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  number    Int
+  startTime String
+  endTime   String
+
+  teacherUnavailabilities TeacherUnavailability[]
+  roomUnavailabilities    RoomUnavailability[]
+  scheduleRules           ScheduleRule[]
+  scheduleEntries         ScheduleEntry[]
+  reservations            Reservation[]
+
+  @@unique([termId, number])
+}
+
+model AcademicEvent {
+  id             String     @id @default(cuid())
+  termId         String
+  term           SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  eventType      String
+  date           DateTime   @db.Date
+  allowException Boolean    @default(false)
+  note           String?
+}
+
+enum RepeatUnit {
+  DAY
+  WEEK
+  MONTH
+}
+
+enum EndType {
+  NONE
+  DATE
+  COUNT
+}
+
+model ScheduleRule {
+  id         String      @id @default(cuid())
+  termId     String
+  term       SchoolTerm  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  roomId     String
+  room       SpecialRoom @relation(fields: [roomId], references: [id])
+  classId    String
+  classGroup ClassGroup  @relation(fields: [classId], references: [id])
+  subjectId  String?
+  subject    Subject?    @relation(fields: [subjectId], references: [id])
+  teacherId  String?
+  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+  periodId   String
+  period     Period      @relation(fields: [periodId], references: [id])
+
+  startDate      DateTime   @db.Date
+  repeatInterval Int        @default(1)
+  repeatUnit     RepeatUnit @default(WEEK)
+  repeatDays     Int[]
+  endType        EndType    @default(NONE)
+  endDate        DateTime?  @db.Date
+  endCount       Int?
+
+  entries   ScheduleEntry[]
+  createdAt DateTime @default(now())
+}
+
+model ScheduleEntry {
+  id         String      @id @default(cuid())
+  termId     String
+  term       SchoolTerm  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  date       DateTime    @db.Date
+  periodId   String
+  period     Period      @relation(fields: [periodId], references: [id])
+  roomId     String
+  room       SpecialRoom @relation(fields: [roomId], references: [id])
+  classId    String
+  classGroup ClassGroup  @relation(fields: [classId], references: [id])
+  subjectId  String?
+  subject    Subject?    @relation(fields: [subjectId], references: [id])
+  teacherId  String?
+  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+
+  sourceRuleId String?
+  sourceRule   ScheduleRule? @relation(fields: [sourceRuleId], references: [id])
+  source       EntrySource   @default(RULE)
+  status       EntryStatus   @default(NORMAL)
+
+  @@unique([date, periodId, roomId, classId])
+}
+
+enum EntrySource {
+  RULE
+  RESERVATION
+  MANUAL
+}
+
+enum EntryStatus {
+  NORMAL
+  EXCEPTION_CANCELLED
+  FORCE_ASSIGNED
+  EXCEPTION_ALLOWED
+}
+
+model Reservation {
+  id         String      @id @default(cuid())
+  termId     String
+  term       SchoolTerm  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  date       DateTime    @db.Date
+  periodId   String
+  period     Period      @relation(fields: [periodId], references: [id])
+  roomId     String
+  room       SpecialRoom @relation(fields: [roomId], references: [id])
+  classId    String
+  classGroup ClassGroup  @relation(fields: [classId], references: [id])
+  subjectId  String?
+  subject    Subject?    @relation(fields: [subjectId], references: [id])
+  teacherId  String?
+  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+  reason     String?
+  createdAt  DateTime    @default(now())
 }
