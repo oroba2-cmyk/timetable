@@ -8,7 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { createRoom, updateRoom } from './actions'
 import type { SpecialRoom } from '@/generated/prisma'
 
-const ROOM_TYPE_PRESETS = ['과학실', '컴퓨터실', '음악실', '미술실', '시청각실', '체육관', '운동장', '도서실']
+const GRADE_LABELS: Record<number, string> = {
+  1: '1학년',
+  2: '2학년',
+  3: '3학년',
+  4: '4학년',
+  5: '5학년',
+  6: '6학년',
+}
 
 interface Props {
   termId: string
@@ -19,12 +26,22 @@ interface Props {
 export function RoomForm({ termId, room, trigger }: Props) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  const [selectedGrades, setSelectedGrades] = useState<number[]>(room?.grades ?? [])
+  const [hasOther, setHasOther] = useState(!!room?.otherGradeNote)
+
+  function toggleGrade(grade: number) {
+    setSelectedGrades((prev) =>
+      prev.includes(grade) ? prev.filter((g) => g !== grade) : [...prev, grade]
+    )
+  }
 
   async function handleSubmit(fd: FormData) {
     const data = {
       termId,
       name: fd.get('name') as string,
-      roomType: fd.get('roomType') as string,
+      location: (fd.get('location') as string) || undefined,
+      grades: selectedGrades,
+      otherGradeNote: hasOther ? (fd.get('otherGradeNote') as string) : undefined,
       capacity: Number(fd.get('capacity')),
       note: (fd.get('note') as string) || undefined,
     }
@@ -44,24 +61,50 @@ export function RoomForm({ termId, room, trigger }: Props) {
         <DialogHeader>
           <DialogTitle>{room ? '특별실 수정' : '특별실 추가'}</DialogTitle>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form key={room?.id ?? 'new'} action={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name">이름</Label>
+            <Label htmlFor="name">특별실명</Label>
             <Input id="name" name="name" defaultValue={room?.name} required />
           </div>
           <div>
-            <Label htmlFor="roomType">종류</Label>
+            <Label htmlFor="location">위치</Label>
             <Input
-              id="roomType"
-              name="roomType"
-              defaultValue={room?.roomType}
-              list="roomTypeList"
-              required
-              placeholder="직접 입력 또는 선택"
+              id="location"
+              name="location"
+              defaultValue={room?.location ?? ''}
+              placeholder="예) 본관 2층"
             />
-            <datalist id="roomTypeList">
-              {ROOM_TYPE_PRESETS.map((t) => <option key={t} value={t} />)}
-            </datalist>
+          </div>
+          <div>
+            <Label>사용 학년</Label>
+            <div className="flex flex-wrap gap-3 mt-1">
+              {([1, 2, 3, 4, 5, 6] as const).map((grade) => (
+                <label key={grade} className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedGrades.includes(grade)}
+                    onChange={() => toggleGrade(grade)}
+                  />
+                  <span className="text-sm">{GRADE_LABELS[grade]}</span>
+                </label>
+              ))}
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasOther}
+                  onChange={(e) => setHasOther(e.target.checked)}
+                />
+                <span className="text-sm">기타</span>
+              </label>
+            </div>
+            {hasOther && (
+              <Input
+                name="otherGradeNote"
+                className="mt-2"
+                defaultValue={room?.otherGradeNote ?? ''}
+                placeholder="기타 학년 메모"
+              />
+            )}
           </div>
           <div>
             <Label htmlFor="capacity">동시 사용 가능 학급 수</Label>
@@ -70,8 +113,18 @@ export function RoomForm({ termId, room, trigger }: Props) {
               name="capacity"
               type="number"
               min={1}
+              inputMode="numeric"
+              pattern="[0-9]*"
               defaultValue={room?.capacity ?? 1}
               required
+              onKeyDown={(e) => {
+                if (
+                  !/^\d$/.test(e.key) &&
+                  !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)
+                ) {
+                  e.preventDefault()
+                }
+              }}
             />
           </div>
           <div>

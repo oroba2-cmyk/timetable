@@ -15,7 +15,10 @@ export async function listRooms(termId: string): Promise<SpecialRoom[]> {
 export async function createRoom(data: {
   termId: string
   name: string
-  roomType: string
+  roomType?: string
+  location?: string
+  grades: number[]
+  otherGradeNote?: string
   capacity: number
   note?: string
 }): Promise<ActionResult<SpecialRoom>> {
@@ -30,7 +33,15 @@ export async function createRoom(data: {
 
 export async function updateRoom(
   id: string,
-  data: { name: string; roomType: string; capacity: number; note?: string }
+  data: {
+    name: string
+    roomType?: string
+    location?: string
+    grades: number[]
+    otherGradeNote?: string
+    capacity: number
+    note?: string
+  }
 ): Promise<ActionResult<SpecialRoom>> {
   try {
     const room = await prisma.specialRoom.update({ where: { id }, data })
