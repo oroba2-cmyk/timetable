@@ -57,3 +57,44 @@ export async function deleteClassGroup(id: string): Promise<ActionResult> {
     return { success: false, error: '학급 삭제 중 오류가 발생했습니다.' }
   }
 }
+
+export async function autoGenerateClasses(
+  termId: string,
+  gradeNumber: number,
+  count: number
+): Promise<ActionResult<{ created: number }>> {
+  try {
+    const grade = await prisma.grade.upsert({
+      where: { termId_number: { termId, number: gradeNumber } },
+      create: { termId, number: gradeNumber },
+      update: {},
+    })
+    for (let classNumber = 1; classNumber <= count; classNumber++) {
+      await prisma.classGroup.upsert({
+        where: { gradeId_number: { gradeId: grade.id, number: classNumber } },
+        create: { gradeId: grade.id, number: classNumber },
+        update: {},
+      })
+    }
+    revalidatePath('/classes')
+    return { success: true, data: { created: count } }
+  } catch {
+    return { success: false, error: '학급 자동 생성 중 오류가 발생했습니다.' }
+  }
+}
+
+export async function renameClassGroup(
+  id: string,
+  displayName: string
+): Promise<ActionResult> {
+  try {
+    await prisma.classGroup.update({
+      where: { id },
+      data: { displayName: displayName.trim() || null },
+    })
+    revalidatePath('/classes')
+    return { success: true, data: undefined }
+  } catch {
+    return { success: false, error: '학급 이름 변경 중 오류가 발생했습니다.' }
+  }
+}
