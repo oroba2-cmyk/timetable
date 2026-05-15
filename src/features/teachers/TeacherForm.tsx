@@ -51,7 +51,7 @@ export function TeacherForm({ termId, teacher, subjects, trigger }: Props) {
         <DialogHeader>
           <DialogTitle>{teacher ? '교사 수정' : '교사 추가'}</DialogTitle>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form key={teacher?.id ?? 'new'} action={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="name">이름</Label>
             <Input id="name" name="name" defaultValue={teacher?.name} required />

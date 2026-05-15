@@ -71,3 +71,25 @@ export async function deleteTeacher(id: string): Promise<ActionResult> {
     return { success: false, error: '교사 삭제 중 오류가 발생했습니다.' }
   }
 }
+
+export async function bulkCreateTeachers(
+  termId: string,
+  names: string[],
+  type: 'HOMEROOM' | 'SPECIALIZED' | 'CONCURRENT' = 'HOMEROOM'
+): Promise<ActionResult<{ created: number; skipped: number }>> {
+  try {
+    let created = 0, skipped = 0
+    for (const name of names) {
+      const trimmed = name.trim()
+      if (!trimmed) continue
+      const existing = await prisma.teacher.findFirst({ where: { termId, name: trimmed } })
+      if (existing) { skipped++; continue }
+      await prisma.teacher.create({ data: { termId, name: trimmed, type } })
+      created++
+    }
+    revalidatePath('/teachers')
+    return { success: true, data: { created, skipped } }
+  } catch {
+    return { success: false, error: '교사 일괄 등록 중 오류가 발생했습니다.' }
+  }
+}
