@@ -301,6 +301,7 @@ export function ScheduleEditor({
 
     {pickerCell && (
       <ClassPickerDialog
+        key={`picker-${pickerCell.date}-${pickerCell.periodId}`}
         open={true}
         onClose={() => setPickerCell(null)}
         termId={termId}
@@ -316,7 +317,7 @@ export function ScheduleEditor({
     {/* Post-assignment rule creation queue */}
     {ruleQueue.length > 0 && (
       <RuleDialog
-        key={`rule-queue-${ruleQueue[0].classId}`}
+        key={`rule-queue-${ruleQueue[0].classId}-${ruleQueue[0].periodId}-${ruleQueue[0].repeatDay ?? ''}`}
         termId={termId}
         rooms={fullRooms}
         classes={fullClasses}

@@ -187,7 +187,7 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
           {/* For specialist: teacher is required and shown first; for room: subject first, teacher optional */}
           {isSpecialist ? (
             <>
-              <div>
+              <div key="rule-field-teacher">
                 <Label>교사</Label>
                 <select name="teacherId" required defaultValue={editRule?.teacherId ?? prefill?.teacherId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
                   <option value="">선택하세요</option>
@@ -196,7 +196,7 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
                   ))}
                 </select>
               </div>
-              <div>
+              <div key="rule-field-subject">
                 <Label>과목 (선택)</Label>
                 <select name="subjectId" defaultValue={editRule?.subjectId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
                   <option value="">없음</option>
@@ -206,14 +206,14 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
             </>
           ) : (
             <>
-              <div>
+              <div key="rule-field-subject">
                 <Label>과목 (선택)</Label>
                 <select name="subjectId" defaultValue={editRule?.subjectId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
                   <option value="">없음</option>
                   {subjects.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </select>
               </div>
-              <div>
+              <div key="rule-field-teacher">
                 <Label>교사 (선택)</Label>
                 <select name="teacherId" defaultValue={editRule?.teacherId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
                   <option value="">없음</option>

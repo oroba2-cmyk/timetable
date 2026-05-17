@@ -114,6 +114,7 @@ export default async function SchedulePage({
         termStartDate={new Date(activeTerm.startDate).toISOString().slice(0, 10)}
         headerButton={
           <RuleDialog
+            key="schedule-header-rule-dialog"
             termId={activeTerm.id}
             rooms={rooms}
             classes={fullClasses}

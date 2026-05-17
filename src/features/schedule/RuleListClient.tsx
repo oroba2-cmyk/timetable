@@ -178,6 +178,7 @@ export function RuleListClient({ rules, termId, rooms, classes, subjects, teache
             <div className="flex gap-2 shrink-0">
               {singleRule && (
                 <RuleDialog
+                  key={`edit-rule-${singleRule.edit.id}`}
                   termId={termId}
                   rooms={rooms}
                   classes={classes}
