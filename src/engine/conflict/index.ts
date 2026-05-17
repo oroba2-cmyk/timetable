@@ -2,7 +2,7 @@ export interface EntryLike {
   id: string
   date: Date
   periodId: string
-  roomId: string
+  roomId: string | null
   classId: string
   teacherId: string | null
   status: string
@@ -39,13 +39,13 @@ interface CheckParams {
   entry: {
     date: Date
     periodId: string
-    roomId: string
+    roomId: string | null
     classId: string
     teacherId: string | null
   }
   existing: EntryLike[]
-  room: RoomInfo
-  roomUnavailabilities: UnavailabilityInput[]
+  room: RoomInfo | null                       // null for specialist (no room)
+  roomUnavailabilities: UnavailabilityInput[] // empty for specialist
   teacherUnavailabilities: UnavailabilityInput[]
   excludeEntryId?: string
 }
@@ -75,13 +75,15 @@ export function checkConflict(params: CheckParams): ConflictResult {
     (e) => isSameDayUTC(e.date, entry.date) && e.periodId === entry.periodId
   )
 
-  // 1. 특별실 용량 초과
-  const roomUsage = sameSlot.filter((e) => e.roomId === entry.roomId).length
-  if (roomUsage >= room.capacity) {
-    conflicts.push({
-      type: 'ROOM_CAPACITY',
-      message: `특별실 수용 인원 초과 (최대 ${room.capacity}개 학급 동시 사용 가능)`,
-    })
+  // 1. 특별실 용량 초과 (only when room is assigned)
+  if (entry.roomId && room) {
+    const roomUsage = sameSlot.filter((e) => e.roomId === entry.roomId).length
+    if (roomUsage >= room.capacity) {
+      conflicts.push({
+        type: 'ROOM_CAPACITY',
+        message: `특별실 수용 인원 초과 (최대 ${room.capacity}개 학급 동시 사용 가능)`,
+      })
+    }
   }
 
   // 2. 학급 중복 배정
@@ -100,21 +102,26 @@ export function checkConflict(params: CheckParams): ConflictResult {
     })
   }
 
-  // 4. 특별실 비가용 시간
-  const dayOfWeek = toMondayBasedDayUTC(entry.date)
-  if (roomUnavailabilities.some((u) => u.dayOfWeek === dayOfWeek && u.periodId === entry.periodId)) {
-    conflicts.push({
-      type: 'ROOM_UNAVAILABLE',
-      message: '특별실이 해당 요일·교시에 사용 불가로 설정되어 있습니다',
-    })
+  // 4. 특별실 비가용 시간 (only when room is assigned)
+  if (entry.roomId) {
+    const dayOfWeek = toMondayBasedDayUTC(entry.date)
+    if (roomUnavailabilities.some((u) => u.dayOfWeek === dayOfWeek && u.periodId === entry.periodId)) {
+      conflicts.push({
+        type: 'ROOM_UNAVAILABLE',
+        message: '특별실이 해당 요일·교시에 사용 불가로 설정되어 있습니다',
+      })
+    }
   }
 
   // 5. 교사 비가용 시간
-  if (entry.teacherId && teacherUnavailabilities.some((u) => u.dayOfWeek === dayOfWeek && u.periodId === entry.periodId)) {
-    conflicts.push({
-      type: 'TEACHER_UNAVAILABLE',
-      message: '교사가 해당 요일·교시에 비가용으로 설정되어 있습니다',
-    })
+  if (entry.teacherId) {
+    const dayOfWeek = toMondayBasedDayUTC(entry.date)
+    if (teacherUnavailabilities.some((u) => u.dayOfWeek === dayOfWeek && u.periodId === entry.periodId)) {
+      conflicts.push({
+        type: 'TEACHER_UNAVAILABLE',
+        message: '교사가 해당 요일·교시에 비가용으로 설정되어 있습니다',
+      })
+    }
   }
 
   return { hasConflict: conflicts.length > 0, conflicts }

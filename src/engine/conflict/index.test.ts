@@ -93,3 +93,19 @@ describe('excludeEntryId', () => {
     expect(result.hasConflict).toBe(false)
   })
 })
+
+describe('specialist (roomId: null)', () => {
+  it('specialist entry: no room capacity conflict, but class double-booking fires', () => {
+    const existing: EntryLike[] = [{
+      id: 'e1', date: new Date('2026-04-07'), periodId: 'p1',
+      roomId: null, classId: 'c1', teacherId: 't1', status: 'NORMAL',
+    }]
+    const result = checkConflict({
+      entry: { date: new Date('2026-04-07'), periodId: 'p1', roomId: null, classId: 'c1', teacherId: 't2' },
+      existing, room: null, roomUnavailabilities: [], teacherUnavailabilities: [],
+    })
+    expect(result.hasConflict).toBe(true)
+    expect(result.conflicts.map(c => c.type)).toContain('CLASS_DOUBLE_BOOKING')
+    expect(result.conflicts.map(c => c.type)).not.toContain('ROOM_CAPACITY')
+  })
+})
