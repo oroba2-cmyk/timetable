@@ -7,7 +7,7 @@ import { SpecialistAssignDialog } from './SpecialistAssignDialog'
 import { RoomWeeklyGrid } from '@/features/schedule/RoomWeeklyGrid'
 import type { RoomEntryData, GridPeriodRow } from '@/features/schedule/RoomWeeklyGrid'
 import { RuleListClient, type RuleItem } from '@/features/schedule/RuleListClient'
-import { RuleDialog, type RulePrefill } from '@/features/schedule/RuleDialog'
+import { RuleDialog } from '@/features/schedule/RuleDialog'
 import { cancelScheduleEntry, deleteScheduleRule } from '@/features/schedule/actions'
 import type { SpecialRoom, ClassGroup, Grade, Subject, Teacher, Period } from '@/generated/prisma'
 
@@ -39,7 +39,6 @@ interface RoomData {
 
 interface Props {
   termId: string
-  termStartDate: string
   teachers: TeacherData[]
   allPeriods: AllPeriodDetailed[]
   classes: ClassData[]
@@ -100,14 +99,13 @@ function computePeriodRows(allPeriods: AllPeriodDetailed[], gradeNumbers: number
 }
 
 export function SpecialistEditor({
-  termId, termStartDate, teachers, allPeriods, classes, rooms, weekDates, entries, rules,
+  termId, teachers, allPeriods, classes, rooms, weekDates, entries, rules,
   fullRooms, fullClasses, subjects, allTeachers, rawPeriods, headerButton,
 }: Props) {
   const router = useRouter()
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(teachers[0]?.id ?? null)
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null)
   const [pickerCell, setPickerCell] = useState<{ date: string; periodId: string } | null>(null)
-  const [ruleQueue, setRuleQueue] = useState<RulePrefill[]>([])
   const [, startTransition] = useTransition()
 
   const gradeNumbers = [...new Set(classes.map(c => c.grade.number))].sort((a, b) => a - b)
@@ -139,39 +137,13 @@ export function SpecialistEditor({
     }
   }
 
-  function handleAssigned(details: { teacherId: string; classIds: string[]; periodId: string; date: string }) {
+  function handleAssigned() {
     setPickerCell(null)
     router.refresh()
-    const d = new Date(details.date)
-    const utcDay = d.getUTCDay()
-    const repeatDay = utcDay === 0 ? 6 : utcDay - 1
-    setRuleQueue(details.classIds.map(classId => ({
-      classId,
-      periodId: details.periodId,
-      startDate: termStartDate,
-      repeatDay,
-      teacherId: details.teacherId,
-    })))
   }
 
   return (
     <>
-    {ruleQueue.length > 0 && (
-      <RuleDialog
-        termId={termId}
-        rooms={fullRooms}
-        classes={fullClasses}
-        subjects={subjects}
-        teachers={allTeachers}
-        periods={rawPeriods}
-        ruleType="SPECIALIST"
-        prefill={ruleQueue[0]}
-        forcedOpen={true}
-        onForcedClose={() => setRuleQueue(q => q.slice(1))}
-        onSaved={() => { setRuleQueue(q => q.slice(1)); router.refresh() }}
-      />
-    )}
-
     <div className="flex items-center justify-end gap-2 mb-3">
       {headerButton}
     </div>
@@ -243,7 +215,7 @@ export function SpecialistEditor({
         date={pickerCell.date}
         classes={selectedGrade !== null ? classes.filter(c => c.grade.number === selectedGrade) : classes}
         availableRooms={rooms}
-        onAssigned={details => handleAssigned({ ...details, teacherId: selectedTeacherId })}
+        onAssigned={handleAssigned}
       />
     )}
 

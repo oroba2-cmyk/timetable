@@ -94,7 +94,6 @@ export default async function SpecialistPage({
 
       <SpecialistEditor
         termId={activeTerm.id}
-        termStartDate={new Date(activeTerm.startDate).toISOString().slice(0, 10)}
         teachers={specialistTeachers}
         allPeriods={allPeriods.map(p => ({
           id: p.id, number: p.number, gradeNumber: p.gradeNumber,

@@ -26,7 +26,7 @@ interface Props {
   date: string     // YYYY-MM-DD
   classes: ClassData[]
   availableRooms: RoomOption[]
-  onAssigned: (details: { teacherId: string; classIds: string[]; periodId: string; date: string }) => void
+  onAssigned: () => void
 }
 
 const DAY_KO = ['월', '화', '수', '목', '금', '토', '일']
@@ -75,10 +75,9 @@ export function SpecialistAssignDialog({
         conflicts += result.data.conflicts
       }
       if (conflicts > 0) alert(`${created}개 배정 완료, ${conflicts}개 충돌 감지됨`)
-      const assignedClassIds = [...selected]
       setSelected(new Set())
       setSelectedRoomId('')
-      onAssigned({ teacherId, classIds: assignedClassIds, periodId, date })
+      onAssigned()
     })
   }
 

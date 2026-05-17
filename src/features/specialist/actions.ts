@@ -42,17 +42,20 @@ export async function quickAssignSpecialist(data: {
       },
     })
 
-    const existingEntries = await prisma.scheduleEntry.findMany({ where: { termId: data.termId } })
-    const roomUnavailabilities = data.roomId
-      ? await prisma.roomUnavailability.findMany({ where: { roomId: data.roomId } })
-      : []
+    const [existingEntries, roomUnavailabilities, teacherUnavailabilities] = await Promise.all([
+      prisma.scheduleEntry.findMany({ where: { termId: data.termId } }),
+      data.roomId
+        ? prisma.roomUnavailability.findMany({ where: { roomId: data.roomId } })
+        : Promise.resolve([]),
+      prisma.teacherUnavailability.findMany({ where: { teacherId: data.teacherId } }),
+    ])
 
     const conflictResult = checkConflict({
       entry: { date: entryDate, periodId: data.periodId, roomId: data.roomId ?? null, classId: data.classId, teacherId: data.teacherId },
       existing: existingEntries as EntryLike[],
       room: room ? { id: room.id, capacity: room.capacity } : null,
       roomUnavailabilities: roomUnavailabilities.map(u => ({ dayOfWeek: u.dayOfWeek, periodId: u.periodId })),
-      teacherUnavailabilities: [],
+      teacherUnavailabilities: teacherUnavailabilities.map(u => ({ dayOfWeek: u.dayOfWeek, periodId: u.periodId })),
     })
 
     const status = conflictResult.hasConflict ? 'FORCE_ASSIGNED' : 'NORMAL'
@@ -70,7 +73,13 @@ export async function quickAssignSpecialist(data: {
         sourceRuleId: rule.id,
         status,
       },
-      update: { status },
+      update: {
+        teacherId: data.teacherId,
+        roomId: data.roomId ?? null,
+        sourceRuleId: rule.id,
+        source: 'RULE',
+        status,
+      },
     })
 
     revalidatePath('/specialist')

@@ -350,6 +350,7 @@ export async function cancelScheduleEntry(entryId: string): Promise<ActionResult
 
     // 2. Revalidate
     revalidatePath('/schedule')
+    revalidatePath('/specialist')
 
     return { success: true, data: undefined }
   } catch (err) {
