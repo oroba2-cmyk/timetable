@@ -42,33 +42,43 @@ model ClassGroup {
   gradeId           String
   grade             Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
   number            Int
+  displayName       String?
   homeroomTeacherId String?
   homeroomTeacher   Teacher? @relation("HomeroomClass", fields: [homeroomTeacherId], references: [id])
 
-  scheduleRules   ScheduleRule[]
-  scheduleEntries ScheduleEntry[]
-  reservations    Reservation[]
+  subjectClassGroups SubjectClassGroup[]
+  scheduleRules      ScheduleRule[]
+  scheduleEntries    ScheduleEntry[]
+  reservations       Reservation[]
 
   @@unique([gradeId, number])
 }
 
 model Subject {
-  id           String      @id @default(cuid())
-  termId       String
-  name         String
-  type         SubjectType @default(GENERAL)
-  requiresRoom Boolean     @default(false)
+  id             String  @id @default(cuid())
+  termId         String
+  name           String
+  isSpecialized  Boolean @default(false)
+  requiresRoom   Boolean @default(false)
+  weeklyHours    Int     @default(1)
 
-  teacherSubjects TeacherSubject[]
-  scheduleRules   ScheduleRule[]
-  scheduleEntries ScheduleEntry[]
-  reservations    Reservation[]
+  teacherSubjects    TeacherSubject[]
+  subjectClassGroups SubjectClassGroup[]
+  scheduleRules      ScheduleRule[]
+  scheduleEntries    ScheduleEntry[]
+  reservations       Reservation[]
 }
 
-enum SubjectType {
-  SPECIALIZED
-  GENERAL
+model SubjectClassGroup {
+  id           String     @id @default(cuid())
+  subjectId    String
+  subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  classGroupId String
+  classGroup   ClassGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, classGroupId])
 }
+
 
 model Teacher {
   id     String      @id @default(cuid())
@@ -87,7 +97,7 @@ model Teacher {
 enum TeacherType {
   HOMEROOM
   SPECIALIZED
-  CONCURRENT
+  TEMP_HOMEROOM
 }
 
 model TeacherSubject {
@@ -112,13 +122,16 @@ model TeacherUnavailability {
 }
 
 model SpecialRoom {
-  id       String     @id @default(cuid())
-  termId   String
-  term     SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
-  name     String
-  roomType String
-  capacity Int        @default(1)
-  note     String?
+  id             String     @id @default(cuid())
+  termId         String
+  term           SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  name           String
+  roomType       String?
+  location       String?
+  grades         Int[]
+  otherGradeNote String?
+  capacity       Int        @default(1)
+  note           String?
 
   unavailabilities RoomUnavailability[]
   scheduleRules    ScheduleRule[]
@@ -138,12 +151,14 @@ model RoomUnavailability {
 }
 
 model Period {
-  id        String     @id @default(cuid())
-  termId    String
-  term      SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
-  number    Int
-  startTime String
-  endTime   String
+  id          String     @id @default(cuid())
+  termId      String
+  term        SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  number      Int
+  gradeNumber Int        @default(0)
+  label       String?
+  startTime   String
+  endTime     String
 
   teacherUnavailabilities TeacherUnavailability[]
   roomUnavailabilities    RoomUnavailability[]
@@ -151,7 +166,7 @@ model Period {
   scheduleEntries         ScheduleEntry[]
   reservations            Reservation[]
 
-  @@unique([termId, number])
+  @@unique([termId, number, gradeNumber])
 }
 
 model AcademicEvent {
@@ -160,6 +175,7 @@ model AcademicEvent {
   term           SchoolTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
   eventType      String
   date           DateTime   @db.Date
+  endDate        DateTime?  @db.Date
   allowException Boolean    @default(false)
   note           String?
 }
@@ -180,8 +196,8 @@ model ScheduleRule {
   id         String      @id @default(cuid())
   termId     String
   term       SchoolTerm  @relation(fields: [termId], references: [id], onDelete: Cascade)
-  roomId     String
-  room       SpecialRoom @relation(fields: [roomId], references: [id])
+  roomId     String?
+  room       SpecialRoom? @relation(fields: [roomId], references: [id])
   classId    String
   classGroup ClassGroup  @relation(fields: [classId], references: [id])
   subjectId  String?
@@ -210,8 +226,8 @@ model ScheduleEntry {
   date       DateTime    @db.Date
   periodId   String
   period     Period      @relation(fields: [periodId], references: [id])
-  roomId     String
-  room       SpecialRoom @relation(fields: [roomId], references: [id])
+  roomId     String?
+  room       SpecialRoom? @relation(fields: [roomId], references: [id])
   classId    String
   classGroup ClassGroup  @relation(fields: [classId], references: [id])
   subjectId  String?
@@ -224,7 +240,7 @@ model ScheduleEntry {
   source       EntrySource   @default(RULE)
   status       EntryStatus   @default(NORMAL)
 
-  @@unique([date, periodId, roomId, classId])
+  @@unique([date, periodId, classId])
 }
 
 enum EntrySource {
