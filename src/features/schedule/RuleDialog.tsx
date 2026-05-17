@@ -30,6 +30,7 @@ export interface RulePrefill {
   periodId?: string
   startDate?: string
   repeatDay?: number   // 0=월, 4=금
+  teacherId?: string
 }
 
 interface Props {
@@ -42,6 +43,7 @@ interface Props {
   trigger?: React.ReactNode
   editRule?: EditRuleData
   prefill?: RulePrefill
+  ruleType?: 'ROOM' | 'SPECIALIST'
   // Programmatic control — used when no trigger
   forcedOpen?: boolean
   onForcedClose?: () => void
@@ -50,8 +52,9 @@ interface Props {
 
 const DAY_LABELS = ['월', '화', '수', '목', '금']
 
-export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods, trigger, editRule, prefill, forcedOpen, onForcedClose, onSaved }: Props) {
+export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods, trigger, editRule, prefill, ruleType, forcedOpen, onForcedClose, onSaved }: Props) {
   const isEdit = !!editRule
+  const isSpecialist = ruleType === 'SPECIALIST'
   const isProgrammatic = forcedOpen !== undefined
   const [localOpen, setLocalOpen] = useState(false)
   const open = isProgrammatic ? (forcedOpen ?? false) : localOpen
@@ -93,7 +96,9 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
     setError('')
     setPending(true)
 
-    const roomId = fd.get('roomId') as string
+    const roomId = isSpecialist
+      ? (fd.get('roomId') as string) || undefined   // optional for specialist
+      : (fd.get('roomId') as string)                // required for room booking
     const classId = fd.get('classId') as string
     const subjectId = (fd.get('subjectId') as string) || undefined
     const teacherId = (fd.get('teacherId') as string) || undefined
@@ -116,7 +121,8 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
 
     const payload = {
       termId,
-      roomId, classId, subjectId, teacherId, periodId,
+      ...(roomId ? { roomId } : {}),
+      classId, subjectId, teacherId, periodId,
       startDate, repeatInterval, repeatUnit,
       repeatDays: repeatUnit === 'WEEK' ? selectedDays : [],
       endType, endDate, endCount,
@@ -143,13 +149,23 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
       {trigger && <DialogTrigger render={trigger as React.ReactElement} />}
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? '배정 규칙 수정' : '배정 규칙 추가'}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? (isSpecialist ? '전담 배정 규칙 수정' : '배정 규칙 수정')
+              : (isSpecialist ? '전담 배정 규칙 추가' : '배정 규칙 추가')}
+          </DialogTitle>
         </DialogHeader>
         <form key={String(open) + (prefill?.classId ?? '')} action={handleSubmit} className="space-y-4">
           {/* Special Room */}
           <div>
-            <Label>특별실</Label>
-            <select name="roomId" required defaultValue={editRule?.roomId ?? prefill?.roomId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
+            <Label>특별실 {isSpecialist ? '(선택)' : ''}</Label>
+            <select
+              name="roomId"
+              required={!isSpecialist}
+              defaultValue={editRule?.roomId ?? prefill?.roomId ?? ''}
+              className="w-full border rounded px-2 py-1.5 text-sm"
+            >
+              {isSpecialist && <option value="">없음 (일반 교실)</option>}
               {rooms.map((room) => (
                 <option key={room.id} value={room.id}>{room.name}</option>
               ))}
@@ -166,27 +182,46 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
             </select>
           </div>
 
-          {/* Subject */}
-          <div>
-            <Label>과목 (선택)</Label>
-            <select name="subjectId" defaultValue={editRule?.subjectId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
-              <option value="">없음</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Teacher */}
-          <div>
-            <Label>교사 (선택)</Label>
-            <select name="teacherId" defaultValue={editRule?.teacherId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
-              <option value="">없음</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* For specialist: teacher is required and shown first; for room: subject first, teacher optional */}
+          {isSpecialist ? (
+            <>
+              <div>
+                <Label>교사</Label>
+                <select name="teacherId" required defaultValue={editRule?.teacherId ?? prefill?.teacherId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="">선택하세요</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>과목 (선택)</Label>
+                <select name="subjectId" defaultValue={editRule?.subjectId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="">없음</option>
+                  {subjects.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <Label>과목 (선택)</Label>
+                <select name="subjectId" defaultValue={editRule?.subjectId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="">없음</option>
+                  {subjects.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                </select>
+              </div>
+              <div>
+                <Label>교사 (선택)</Label>
+                <select name="teacherId" defaultValue={editRule?.teacherId ?? ''} className="w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="">없음</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Period */}
           <div>
