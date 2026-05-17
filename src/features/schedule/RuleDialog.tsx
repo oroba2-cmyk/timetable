@@ -146,8 +146,10 @@ export function RuleDialog({ termId, rooms, classes, subjects, teachers, periods
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {trigger && <DialogTrigger render={trigger as React.ReactElement} />}
-      <DialogContent className="max-w-lg">
+      {trigger && (
+        <DialogTrigger key="rule-dialog-trigger" render={trigger as React.ReactElement} />
+      )}
+      <DialogContent key="rule-dialog-content" className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {isEdit

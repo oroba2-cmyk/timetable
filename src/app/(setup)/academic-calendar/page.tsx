@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { listAcademicEvents, deleteAcademicEvent, getKeyDates } from '@/features/academic-calendar/actions'
-import { listTerms } from '@/features/terms/actions'
+import { resolveActiveTerm } from '@/features/terms/actions'
+import { ActiveTermBadge } from '@/components/ActiveTermBadge'
 import { EventForm } from '@/features/academic-calendar/EventForm'
 import { KeyDatesPanel } from '@/features/academic-calendar/KeyDatesPanel'
 import { HolidayImport } from '@/features/academic-calendar/HolidayImport'
@@ -15,13 +16,12 @@ function formatDate(date: Date): string {
 }
 
 export default async function AcademicCalendarPage() {
-  const terms = await listTerms()
-  const activeTerm = terms[0]
+  const activeTerm = await resolveActiveTerm({ date: new Date() })
 
   if (!activeTerm) {
     return (
       <div className="p-6">
-        <p className="text-gray-500">먼저 홈에서 학기를 등록해 주세요.</p>
+        <p className="text-gray-500">등록된 학기가 없습니다.</p>
       </div>
     )
   }
@@ -36,7 +36,13 @@ export default async function AcademicCalendarPage() {
 
   return (
     <div className="p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">학사일정 관리</h1>
+      <h1 className="text-2xl font-bold mb-6">
+        학사일정 관리
+        <ActiveTermBadge year={activeTerm.year} semester={activeTerm.semester} />
+      </h1>
+      <p className="text-sm text-gray-500 mb-4">
+        공휴일·재량휴업일은 같은 계정의 모든 학기 중 해당 날짜가 학기 기간 안에 있으면 자동으로 반영됩니다.
+      </p>
 
       {/* 기본 학사일정 */}
       <KeyDatesPanel termId={activeTerm.id} initial={keyDates} />

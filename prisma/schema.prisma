@@ -7,8 +7,37 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  ADMIN
+  USER
+}
+
+/// 계정별 데이터 격리 (학교명 표시·학기·시간표 전체)
+model Tenant {
+  id         String   @id @default(cuid())
+  schoolName String
+  createdAt  DateTime @default(now())
+
+  users      User[]
+  schoolTerms SchoolTerm[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  loginId      String   @unique
+  passwordHash String
+  role         UserRole @default(USER)
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+}
+
 model SchoolTerm {
   id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   year      Int
   semester  Int
   startDate DateTime @db.Date
@@ -23,7 +52,8 @@ model SchoolTerm {
   scheduleEntries ScheduleEntry[]
   reservations    Reservation[]
 
-  @@unique([year, semester])
+  @@unique([tenantId, year, semester])
+  @@index([tenantId])
 }
 
 model Grade {
@@ -78,7 +108,6 @@ model SubjectClassGroup {
 
   @@unique([subjectId, classGroupId])
 }
-
 
 model Teacher {
   id     String      @id @default(cuid())
@@ -193,19 +222,19 @@ enum EndType {
 }
 
 model ScheduleRule {
-  id         String      @id @default(cuid())
+  id         String       @id @default(cuid())
   termId     String
-  term       SchoolTerm  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  term       SchoolTerm   @relation(fields: [termId], references: [id], onDelete: Cascade)
   roomId     String?
   room       SpecialRoom? @relation(fields: [roomId], references: [id])
   classId    String
-  classGroup ClassGroup  @relation(fields: [classId], references: [id])
+  classGroup ClassGroup   @relation(fields: [classId], references: [id])
   subjectId  String?
-  subject    Subject?    @relation(fields: [subjectId], references: [id])
+  subject    Subject?     @relation(fields: [subjectId], references: [id])
   teacherId  String?
-  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+  teacher    Teacher?     @relation(fields: [teacherId], references: [id])
   periodId   String
-  period     Period      @relation(fields: [periodId], references: [id])
+  period     Period       @relation(fields: [periodId], references: [id])
 
   startDate      DateTime   @db.Date
   repeatInterval Int        @default(1)
@@ -220,20 +249,20 @@ model ScheduleRule {
 }
 
 model ScheduleEntry {
-  id         String      @id @default(cuid())
+  id         String       @id @default(cuid())
   termId     String
-  term       SchoolTerm  @relation(fields: [termId], references: [id], onDelete: Cascade)
-  date       DateTime    @db.Date
+  term       SchoolTerm   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  date       DateTime     @db.Date
   periodId   String
-  period     Period      @relation(fields: [periodId], references: [id])
+  period     Period       @relation(fields: [periodId], references: [id])
   roomId     String?
   room       SpecialRoom? @relation(fields: [roomId], references: [id])
   classId    String
-  classGroup ClassGroup  @relation(fields: [classId], references: [id])
+  classGroup ClassGroup   @relation(fields: [classId], references: [id])
   subjectId  String?
-  subject    Subject?    @relation(fields: [subjectId], references: [id])
+  subject    Subject?     @relation(fields: [subjectId], references: [id])
   teacherId  String?
-  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+  teacher    Teacher?     @relation(fields: [teacherId], references: [id])
 
   sourceRuleId String?
   sourceRule   ScheduleRule? @relation(fields: [sourceRuleId], references: [id])

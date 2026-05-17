@@ -9,7 +9,7 @@ import { ClassPickerDialog } from './ClassPickerDialog'
 import { RotationDialog } from './RotationDialog'
 import { RuleListClient, type RuleItem } from './RuleListClient'
 import { RuleDialog, type RulePrefill } from './RuleDialog'
-import { cancelScheduleEntry, deleteScheduleRule } from './actions'
+import { bulkDeleteScheduleRules, cancelScheduleEntry, deleteScheduleRule } from './actions'
 import type { SpecialRoom, ClassGroup, Grade, Subject, Teacher, Period } from '@/generated/prisma'
 
 interface RoomData {
@@ -156,21 +156,36 @@ export function ScheduleEditor({
   const visiblePeriodCount = gridPeriods.filter(p => !(p.label?.includes('점심'))).length
   const totalSlots = weekDates.length * visiblePeriodCount
 
-  function handleEntryAction(
-    entryId: string,
-    sourceRuleId: string | null,
+  function handleEntryAction(payload: {
+    entryIds: string[]
+    sourceRuleIds: string[]
     action: 'cancel' | 'deleteRule'
-  ) {
-    if (action === 'deleteRule') {
-      if (!sourceRuleId) return
-      if (!window.confirm('이 배정 규칙을 삭제하면 모든 주의 해당 배정이 사라집니다. 계속할까요?')) return
+  }) {
+    if (payload.action === 'deleteRule') {
+      if (payload.sourceRuleIds.length === 0) return
+      const n = payload.sourceRuleIds.length
+      if (
+        !window.confirm(
+          n > 1
+            ? `연결된 배정 규칙 ${n}개를 삭제하면 모든 주의 해당 배정이 사라집니다. 계속할까요?`
+            : '이 배정 규칙을 삭제하면 모든 주의 해당 배정이 사라집니다. 계속할까요?'
+        )
+      ) {
+        return
+      }
       startTransition(async () => {
-        await deleteScheduleRule(sourceRuleId)
+        if (n === 1) {
+          await deleteScheduleRule(payload.sourceRuleIds[0])
+        } else {
+          await bulkDeleteScheduleRules(payload.sourceRuleIds)
+        }
         router.refresh()
       })
     } else {
       startTransition(async () => {
-        await cancelScheduleEntry(entryId)
+        for (const entryId of payload.entryIds) {
+          await cancelScheduleEntry(entryId)
+        }
         router.refresh()
       })
     }
@@ -200,6 +215,7 @@ export function ScheduleEditor({
     <>
     {selectedRoom && rotationOpen && (
       <RotationDialog
+        key="rotation-dialog"
         open={rotationOpen}
         onClose={() => setRotationOpen(false)}
         onCreated={() => { setRotationOpen(false); router.refresh() }}
@@ -213,9 +229,9 @@ export function ScheduleEditor({
     )}
 
     {/* Header row: action buttons */}
-    <div className="flex items-center justify-end gap-2 mb-3">
-      {headerButton}
-      {selectedRoomId && (
+    <div key="schedule-header" className="flex items-center justify-end gap-2 mb-3">
+      {headerButton ?? null}
+      {selectedRoomId ? (
         <button
           type="button"
           onClick={() => setRotationOpen(true)}
@@ -223,10 +239,10 @@ export function ScheduleEditor({
         >
           순환 배정
         </button>
-      )}
+      ) : null}
     </div>
 
-    <div className="flex border rounded-lg overflow-hidden min-h-80">
+    <div key="schedule-main" className="flex border rounded-lg overflow-hidden min-h-80">
       {/* Room sidebar */}
       <RoomSidebar
         rooms={rooms}
@@ -273,6 +289,7 @@ export function ScheduleEditor({
             weekDates={weekDates}
             periods={gridPeriods}
             entries={filteredEntries}
+            classes={classes}
             onCellClick={(date, periodId) => setPickerCell({ date, periodId })}
             onEntryAction={handleEntryAction}
             showRoom={showRoom}
@@ -299,6 +316,7 @@ export function ScheduleEditor({
     {/* Post-assignment rule creation queue */}
     {ruleQueue.length > 0 && (
       <RuleDialog
+        key={`rule-queue-${ruleQueue[0].classId}`}
         termId={termId}
         rooms={fullRooms}
         classes={fullClasses}
@@ -313,7 +331,7 @@ export function ScheduleEditor({
     )}
 
     {/* Rules list — filtered by selected room and grade */}
-    <div className="mt-6">
+    <div key="schedule-rules" className="mt-6">
       <h2 className="text-lg font-semibold mb-3">배정 규칙 목록</h2>
       <RuleListClient
         termId={termId}

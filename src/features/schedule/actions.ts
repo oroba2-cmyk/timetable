@@ -24,19 +24,14 @@ export async function listScheduleRules(
   entryType?: 'ROOM' | 'SPECIALIST'
 ) {
   try {
-    const roomFilter =
-      entryType === 'ROOM'       ? { not: null } :
-      entryType === 'SPECIALIST' ? null           :
-      undefined
-
-    const rules = await prisma.scheduleRule.findMany({
-      where: {
-        termId,
-        ...(roomFilter !== undefined ? { roomId: roomFilter } : {}),
-      },
+    const allRules = await prisma.scheduleRule.findMany({
+      where: { termId },
       include: INCLUDE_RULE,
       orderBy: { createdAt: 'asc' },
     })
+    const rules = entryType === 'ROOM'       ? allRules.filter(r => r.roomId !== null)
+                : entryType === 'SPECIALIST' ? allRules.filter(r => r.roomId === null)
+                : allRules
     return { success: true as const, data: rules }
   } catch (err) {
     console.error('[listScheduleRules]', err)
@@ -58,21 +53,18 @@ export async function listEntriesForWeek(
     const end = new Date(start)
     end.setUTCDate(end.getUTCDate() + 7)
 
-    const roomFilter =
-      entryType === 'ROOM'       ? { not: null } :
-      entryType === 'SPECIALIST' ? null           :
-      undefined  // no filter = all
-
-    const entries = await prisma.scheduleEntry.findMany({
+    const allEntries = await prisma.scheduleEntry.findMany({
       where: {
         termId,
         date: { gte: start, lt: end },
         status: { not: 'EXCEPTION_CANCELLED' },
-        ...(roomFilter !== undefined ? { roomId: roomFilter } : {}),
       },
       include: INCLUDE_RULE,
       orderBy: [{ date: 'asc' }, { period: { number: 'asc' } }],
     })
+    const entries = entryType === 'ROOM'       ? allEntries.filter(e => e.roomId !== null)
+                 : entryType === 'SPECIALIST' ? allEntries.filter(e => e.roomId === null)
+                 : allEntries
     return { success: true as const, data: entries }
   } catch (err) {
     console.error('[listEntriesForWeek]', err)

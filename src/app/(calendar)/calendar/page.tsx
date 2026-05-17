@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
-import { listTerms } from '@/features/terms/actions'
+import { resolveActiveTerm } from '@/features/terms/actions'
+import { ActiveTermBadge } from '@/components/ActiveTermBadge'
 import { listRooms } from '@/features/rooms/actions'
 import { listPeriods } from '@/features/periods/actions'
 import { listSubjects } from '@/features/subjects/actions'
@@ -25,8 +26,8 @@ export default async function CalendarPage({
   const month = Number(monthStr || (now.getMonth() + 1))
   const roomFilter = room || null
 
-  const terms = await listTerms()
-  const activeTerm = terms[0]
+  const monthMid = new Date(Date.UTC(year, month - 1, 15))
+  const activeTerm = await resolveActiveTerm({ date: monthMid })
 
   if (!activeTerm) {
     return (
@@ -80,7 +81,10 @@ export default async function CalendarPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">달력형 보기</h1>
+        <h1 className="text-2xl font-bold">
+          달력형 보기
+          <ActiveTermBadge year={activeTerm.year} semester={activeTerm.semester} />
+        </h1>
         <ReservationForm
           termId={activeTerm.id}
           rooms={rooms}

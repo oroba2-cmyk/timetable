@@ -94,9 +94,19 @@ export function HolidayImport({ termId, currentYear }: Props) {
   function fetchHolidays() {
     startTransition(async () => {
       setMessage(null)
-      const result = await importPublicHolidays(termId, startYM, endYM)
-      if (result.success) showMsg(`${result.data.count}개 공휴일이 등록되었습니다. (중복 제외)`)
-      else showMsg(result.error, false)
+      try {
+        const result = await importPublicHolidays(termId, startYM, endYM)
+        if (result.success) showMsg(`${result.data.count}개 공휴일이 등록되었습니다. (중복 제외)`)
+        else showMsg(result.error, false)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        showMsg(
+          msg.includes('network') || msg.includes('fetch')
+            ? '서버와 통신하지 못했습니다. 개발 서버가 실행 중인지 확인한 뒤 다시 시도해 주세요.'
+            : `요청 실패: ${msg}`,
+          false
+        )
+      }
     })
   }
 

@@ -1,12 +1,6 @@
-import { ScheduleEntry, AcademicEvent, SpecialRoom } from '@/generated/prisma'
-
-type EntryWithRelations = ScheduleEntry & {
-  room: SpecialRoom | null
-  classGroup: { number: number; grade: { number: number } }
-  subject: { name: string } | null
-  teacher: { name: string } | null
-  period: { number: number; startTime: string; endTime: string }
-}
+import { AcademicEvent } from '@/generated/prisma'
+import { formatSpecialistSubjectTeacher } from '@/lib/schedule/format-view-entry-label'
+import type { ViewScheduleEntry } from '@/lib/schedule/view-entry-query'
 
 interface UsageStat {
   roomId: string
@@ -15,7 +9,7 @@ interface UsageStat {
   totalSessions: number
 }
 
-function computeUsageStats(entries: EntryWithRelations[]): UsageStat[] {
+function computeUsageStats(entries: ViewScheduleEntry[]): UsageStat[] {
   const map = new Map<string, { roomName: string; dates: Set<string>; sessions: number }>()
 
   for (const e of entries) {
@@ -75,12 +69,14 @@ function computeSchoolDays(termStart: Date, termEnd: Date, academicEvents: Acade
 }
 
 interface Props {
-  entries: EntryWithRelations[]
+  entries: ViewScheduleEntry[]
   academicEvents: AcademicEvent[]
   termStart: Date | string
   termEnd: Date | string
   roomFilter: string | null
   classFilter: string | null
+  periodFilter?: number | null
+  typeFilter?: 'all' | 'room' | 'specialist'
 }
 
 function formatDate(date: Date | string): string {
@@ -101,7 +97,7 @@ function statusLabel(status: string): { text: string; className: string } {
   }
 }
 
-export function ListView({ entries, academicEvents, termStart, termEnd, roomFilter, classFilter }: Props) {
+export function ListView({ entries, academicEvents, termStart, termEnd, roomFilter, classFilter, periodFilter = null, typeFilter = 'all' }: Props) {
   const tsDate = new Date(termStart)
   const teDate = new Date(termEnd)
 
@@ -110,6 +106,9 @@ export function ListView({ entries, academicEvents, termStart, termEnd, roomFilt
     if (e.status === 'EXCEPTION_CANCELLED') return false
     if (roomFilter && e.roomId !== roomFilter) return false
     if (classFilter && e.classId !== classFilter) return false
+    if (periodFilter !== null && e.period.number !== periodFilter) return false
+    if (typeFilter === 'room' && e.roomId === null) return false
+    if (typeFilter === 'specialist' && e.roomId !== null) return false
     return true
   })
 
@@ -163,9 +162,10 @@ export function ListView({ entries, academicEvents, termStart, termEnd, roomFilt
             <table className="w-full text-sm border-collapse border border-gray-200">
               <thead>
                 <tr className="bg-gray-50">
+                  <th className="border border-gray-200 px-3 py-2 text-left">구분</th>
                   <th className="border border-gray-200 px-3 py-2 text-left">날짜</th>
                   <th className="border border-gray-200 px-3 py-2 text-left">교시</th>
-                  <th className="border border-gray-200 px-3 py-2 text-left">특별실</th>
+                  <th className="border border-gray-200 px-3 py-2 text-left">장소</th>
                   <th className="border border-gray-200 px-3 py-2 text-left">학급</th>
                   <th className="border border-gray-200 px-3 py-2 text-left">과목</th>
                   <th className="border border-gray-200 px-3 py-2 text-left">교사</th>
@@ -175,15 +175,26 @@ export function ListView({ entries, academicEvents, termStart, termEnd, roomFilt
               <tbody>
                 {filtered.map(e => {
                   const { text, className } = statusLabel(e.status)
+                  const isSpecialist = e.roomId === null
+                  const rowBg = isSpecialist ? 'hover:bg-green-50' : 'hover:bg-blue-50'
                   return (
-                    <tr key={e.id} className="hover:bg-gray-50">
+                    <tr key={e.id} className={rowBg}>
+                      <td className="border border-gray-200 px-3 py-2">
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                          isSpecialist ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {isSpecialist ? '전담' : '특별실'}
+                        </span>
+                      </td>
                       <td className="border border-gray-200 px-3 py-2">{formatDate(e.date)}</td>
                       <td className="border border-gray-200 px-3 py-2">{e.period.number}교시</td>
-                      <td className="border border-gray-200 px-3 py-2">{e.room?.name ?? '-'}</td>
+                      <td className="border border-gray-200 px-3 py-2">{e.room?.name ?? '일반 교실'}</td>
                       <td className="border border-gray-200 px-3 py-2">
                         {e.classGroup.grade.number}학년 {e.classGroup.number}반
                       </td>
-                      <td className="border border-gray-200 px-3 py-2">{e.subject?.name ?? '-'}</td>
+                      <td className="border border-gray-200 px-3 py-2">
+                        {isSpecialist ? formatSpecialistSubjectTeacher(e) : (e.subject?.name ?? '-')}
+                      </td>
                       <td className="border border-gray-200 px-3 py-2">{e.teacher?.name ?? '-'}</td>
                       <td className={`border border-gray-200 px-3 py-2 ${className}`}>{text}</td>
                     </tr>

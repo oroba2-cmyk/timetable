@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
-import { listTerms } from '@/features/terms/actions'
+import { resolveActiveTerm } from '@/features/terms/actions'
+import { ActiveTermBadge } from '@/components/ActiveTermBadge'
 import { listRooms } from '@/features/rooms/actions'
 import { listGrades } from '@/features/classes/actions'
 import { listAcademicEvents } from '@/features/academic-calendar/actions'
@@ -15,8 +16,9 @@ export default async function ListPage({
 }) {
   const { room, class: classParam, from, to } = await searchParams
 
-  const terms = await listTerms()
-  const activeTerm = terms[0]
+  const activeTerm = await resolveActiveTerm(
+    from && to ? { from, to } : from ? { from, to: from } : { date: new Date() }
+  )
 
   if (!activeTerm) {
     return (
@@ -64,7 +66,10 @@ export default async function ListPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">목록형 보기</h1>
+        <h1 className="text-2xl font-bold">
+          목록형 보기
+          <ActiveTermBadge year={activeTerm.year} semester={activeTerm.semester} />
+        </h1>
         <a
           href={exportUrl}
           className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"

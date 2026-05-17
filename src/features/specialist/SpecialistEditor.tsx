@@ -7,7 +7,11 @@ import { SpecialistAssignDialog } from './SpecialistAssignDialog'
 import { RoomWeeklyGrid } from '@/features/schedule/RoomWeeklyGrid'
 import type { RoomEntryData, GridPeriodRow } from '@/features/schedule/RoomWeeklyGrid'
 import { RuleListClient, type RuleItem } from '@/features/schedule/RuleListClient'
-import { cancelScheduleEntry, deleteScheduleRule } from '@/features/schedule/actions'
+import {
+  bulkDeleteScheduleRules,
+  cancelScheduleEntry,
+  deleteScheduleRule,
+} from '@/features/schedule/actions'
 import type { SpecialRoom, ClassGroup, Grade, Subject, Teacher, Period } from '@/generated/prisma'
 
 interface AllPeriodDetailed {
@@ -120,13 +124,35 @@ export function SpecialistEditor({
     }
   }
 
-  function handleEntryAction(entryId: string, sourceRuleId: string | null, action: 'cancel' | 'deleteRule') {
-    if (action === 'deleteRule') {
-      if (!sourceRuleId) return
-      if (!window.confirm('이 배정 규칙을 삭제하면 모든 주의 해당 배정이 사라집니다. 계속할까요?')) return
-      startTransition(async () => { await deleteScheduleRule(sourceRuleId); router.refresh() })
+  function handleEntryAction(payload: {
+    entryIds: string[]
+    sourceRuleIds: string[]
+    action: 'cancel' | 'deleteRule'
+  }) {
+    if (payload.action === 'deleteRule') {
+      if (payload.sourceRuleIds.length === 0) return
+      const n = payload.sourceRuleIds.length
+      if (
+        !window.confirm(
+          n > 1
+            ? `연결된 배정 규칙 ${n}개를 삭제하면 모든 주의 해당 배정이 사라집니다. 계속할까요?`
+            : '이 배정 규칙을 삭제하면 모든 주의 해당 배정이 사라집니다. 계속할까요?'
+        )
+      ) {
+        return
+      }
+      startTransition(async () => {
+        if (n === 1) await deleteScheduleRule(payload.sourceRuleIds[0])
+        else await bulkDeleteScheduleRules(payload.sourceRuleIds)
+        router.refresh()
+      })
     } else {
-      startTransition(async () => { await cancelScheduleEntry(entryId); router.refresh() })
+      startTransition(async () => {
+        for (const entryId of payload.entryIds) {
+          await cancelScheduleEntry(entryId)
+        }
+        router.refresh()
+      })
     }
   }
 
@@ -184,6 +210,7 @@ export function SpecialistEditor({
             weekDates={weekDates}
             periods={gridPeriods}
             entries={filteredEntries}
+            classes={classes}
             onCellClick={(date, periodId) => {
               if (!selectedSubjectId) return
               setPickerCell({ date, periodId })

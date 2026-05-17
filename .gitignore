@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# database backups (민감 데이터)
+/backups/*.dump
+/backups/*.sql
+/backups/*.sql.gz
 
 # vercel
 .vercel
@@ -41,3 +47,8 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Windows 배포 패키지
+/release/
+/.cache/
+/data/

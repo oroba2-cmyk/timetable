@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
+import { requireTenantId } from '@/lib/auth/tenant-scope'
 import { buildExcelBuffer } from '@/lib/excel/exporter'
 
 export async function GET(req: NextRequest) {
@@ -11,6 +12,12 @@ export async function GET(req: NextRequest) {
 
   if (!termId) {
     return NextResponse.json({ error: 'termId required' }, { status: 400 })
+  }
+
+  const tenantId = await requireTenantId()
+  const term = await prisma.schoolTerm.findFirst({ where: { id: termId, tenantId } })
+  if (!term) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const fromDate = from ? new Date(from) : undefined

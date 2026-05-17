@@ -1,11 +1,13 @@
 'use server'
 
 import { prisma } from '@/lib/db/client'
+import { assertTermInTenant } from '@/lib/auth/tenant-scope'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
 import type { Teacher, TeacherType } from '@/generated/prisma'
 
 export async function listTeachers(termId: string): Promise<Teacher[]> {
+  await assertTermInTenant(termId)
   return prisma.teacher.findMany({
     where: { termId },
     orderBy: { name: 'asc' },
@@ -18,6 +20,7 @@ export async function createTeacher(data: {
   type: TeacherType
 }): Promise<ActionResult<Teacher>> {
   try {
+    await assertTermInTenant(data.termId)
     const teacher = await prisma.teacher.create({
       data: { termId: data.termId, name: data.name, type: data.type },
     })

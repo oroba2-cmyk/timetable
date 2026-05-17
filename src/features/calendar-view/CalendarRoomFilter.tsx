@@ -5,11 +5,13 @@ export function CalendarRoomFilter({
   year,
   month,
   currentRoom,
+  baseUrl = '/calendar',
 }: {
   rooms: { id: string; name: string }[]
   year: number
   month: number
   currentRoom: string | null
+  baseUrl?: string
 }) {
   return (
     <select
@@ -17,7 +19,8 @@ export function CalendarRoomFilter({
       className="border rounded px-2 py-1 text-sm"
       onChange={e => {
         const room = e.target.value
-        window.location.href = `/calendar?year=${year}&month=${month}${room ? `&room=${room}` : ''}`
+        const sep = baseUrl.includes('?') ? '&' : '?'
+        window.location.href = `${baseUrl}${sep}year=${year}&month=${month}${room ? `&room=${room}` : ''}`
       }}
     >
       <option value="">전체 특별실</option>

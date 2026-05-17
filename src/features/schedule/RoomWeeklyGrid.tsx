@@ -1,6 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import {
+  buildClassCountByGrade,
+  groupCellEntriesForDisplay,
+  type CellEntryDisplayGroup,
+} from '@/lib/schedule/group-cell-entries'
 
 export interface RoomEntryData {
   id: string
@@ -29,8 +34,14 @@ interface Props {
   weekDates: string[]
   periods: GridPeriodRow[]
   entries: RoomEntryData[]
+  /** 학년별 학급 수 — 전 학년 배정 시 "3학년" 표기용 */
+  classes?: { grade: { number: number }; number: number }[]
   onCellClick: (date: string, periodId: string) => void
-  onEntryAction: (entryId: string, sourceRuleId: string | null, action: 'cancel' | 'deleteRule') => void
+  onEntryAction: (payload: {
+    entryIds: string[]
+    sourceRuleIds: string[]
+    action: 'cancel' | 'deleteRule'
+  }) => void
   // When true, show room name in chips (used in "모든 특별실" mode)
   showRoom?: boolean
   rooms?: { id: string; name: string }[]
@@ -40,7 +51,19 @@ interface Props {
 
 const DAY_LABELS = ['월', '화', '수', '목', '금']
 
-export function RoomWeeklyGrid({ weekDates, periods, entries, onCellClick, onEntryAction, showRoom, rooms, readOnly }: Props) {
+export function RoomWeeklyGrid({
+  weekDates,
+  periods,
+  entries,
+  classes = [],
+  onCellClick,
+  onEntryAction,
+  showRoom,
+  rooms,
+  readOnly,
+}: Props) {
+  const classCountByGrade = useMemo(() => buildClassCountByGrade(classes), [classes])
+
   function getRoomName(roomId: string | null) {
     if (!roomId) return ''
     return rooms?.find(r => r.id === roomId)?.name ?? ''
@@ -110,14 +133,16 @@ export function RoomWeeklyGrid({ weekDates, periods, entries, onCellClick, onEnt
                         </span>
                       ) : (
                         <div className="flex flex-col gap-0.5">
-                          {cellEntries.map(entry => (
-                            <EntryChip
-                              key={entry.id}
-                              entry={entry}
-                              onAction={onEntryAction}
-                              roomLabel={showRoom ? getRoomName(entry.roomId) : null}
-                            />
-                          ))}
+                          {groupCellEntriesForDisplay(cellEntries, classCountByGrade).map(
+                            (group) => (
+                              <EntryChip
+                                key={group.key}
+                                group={group}
+                                onAction={onEntryAction}
+                                roomLabel={showRoom ? getRoomName(group.roomId) : null}
+                              />
+                            )
+                          )}
                         </div>
                       )}
                     </td>
@@ -133,19 +158,22 @@ export function RoomWeeklyGrid({ weekDates, periods, entries, onCellClick, onEnt
 }
 
 function EntryChip({
-  entry,
+  group,
   onAction,
   roomLabel,
 }: {
-  entry: RoomEntryData
-  onAction: (entryId: string, sourceRuleId: string | null, action: 'cancel' | 'deleteRule') => void
+  group: CellEntryDisplayGroup
+  onAction: (payload: {
+    entryIds: string[]
+    sourceRuleIds: string[]
+    action: 'cancel' | 'deleteRule'
+  }) => void
   roomLabel: string | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const isConflict = entry.status === 'FORCE_ASSIGNED'
+  const isConflict = group.status === 'FORCE_ASSIGNED'
 
-  const classLabel = `${entry.classGroup.grade.number}-${entry.classGroup.number}반`
-  const topLabel = roomLabel ? `${roomLabel} ${classLabel}` : classLabel
+  const topLabel = roomLabel ? `${roomLabel} ${group.classLabel}` : group.classLabel
 
   return (
     <div className="relative inline-block w-full">
@@ -159,13 +187,13 @@ function EntryChip({
         }`}
         onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
       >
-        {entry.subjectName && (
-          <div className="font-semibold">{entry.subjectName}</div>
+                {group.subjectName && (
+          <div className="font-semibold">{group.subjectName}</div>
         )}
-        {entry.teacherName && (
-          <div className="opacity-75">{entry.teacherName}</div>
+        {group.teacherName && (
+          <div className="opacity-75">{group.teacherName}</div>
         )}
-        <div className={entry.subjectName ? 'opacity-75' : ''}>{topLabel}</div>
+        <div className={group.subjectName ? 'opacity-75' : ''}>{topLabel}</div>
       </div>
       {menuOpen && (
         <>
@@ -173,16 +201,29 @@ function EntryChip({
           <div className="absolute z-20 left-0 top-full mt-0.5 bg-white border border-gray-200 rounded shadow-lg text-left min-w-32">
             <button
               className="block w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 text-left"
-              onClick={e => { e.stopPropagation(); setMenuOpen(false); onAction(entry.id, null, 'cancel') }}
+              onClick={e => {
+                e.stopPropagation()
+                setMenuOpen(false)
+                onAction({ entryIds: group.entryIds, sourceRuleIds: [], action: 'cancel' })
+              }}
             >
-              이번만 취소
+              이번만 취소{group.entryIds.length > 1 ? ` (${group.entryIds.length}개)` : ''}
             </button>
-            {entry.sourceRuleId && (
+            {group.sourceRuleIds.length > 0 && (
               <button
                 className="block w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 text-left"
-                onClick={e => { e.stopPropagation(); setMenuOpen(false); onAction(entry.id, entry.sourceRuleId, 'deleteRule') }}
+                onClick={e => {
+                  e.stopPropagation()
+                  setMenuOpen(false)
+                  onAction({
+                    entryIds: group.entryIds,
+                    sourceRuleIds: group.sourceRuleIds,
+                    action: 'deleteRule',
+                  })
+                }}
               >
                 규칙 전체 삭제
+                {group.sourceRuleIds.length > 1 ? ` (${group.sourceRuleIds.length}개)` : ''}
               </button>
             )}
           </div>

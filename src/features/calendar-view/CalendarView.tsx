@@ -1,19 +1,22 @@
-import { ScheduleEntry, AcademicEvent, SpecialRoom } from '@/generated/prisma'
-
-type EntryWithRelations = ScheduleEntry & {
-  room: SpecialRoom | null
-  classGroup: { number: number; grade: { number: number } }
-  subject: { name: string } | null
-  teacher: { name: string } | null
-  period: { number: number }
+import { AcademicEvent } from '@/generated/prisma'
+import { eventCoversDateKey, toDateKey } from '@/lib/dates/date-key'
+import { formatViewEntryLabel, type ViewEntryLabelInput } from '@/lib/schedule/format-view-entry-label'
+/** 달력 칸 표시에 필요한 최소 필드 (view·calendar 공통) */
+export type CalendarDisplayEntry = ViewEntryLabelInput & {
+  id: string
+  date: Date
+  status: string
+  periodId: string
 }
 
 interface Props {
   year: number
   month: number
-  entries: EntryWithRelations[]
+  entries: CalendarDisplayEntry[]
   academicEvents: AcademicEvent[]
   roomFilter: string | null
+  periodFilter?: number | null
+  typeFilter?: 'all' | 'room' | 'specialist'
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -21,13 +24,14 @@ function getDaysInMonth(year: number, month: number): number {
 }
 
 function getFirstDayOfWeek(year: number, month: number): number {
-  const d = new Date(year, month - 1, 1).getDay()
-  return d === 0 ? 6 : d - 1
+  return new Date(year, month - 1, 1).getDay() // 0=일, 1=월, ..., 6=토
 }
 
-const DAY_HEADERS = ['월', '화', '수', '목', '금', '토', '일']
+const DAY_HEADERS = ['일', '월', '화', '수', '목', '금', '토']
+/** 달력 칸마다 표시할 일정 최대 건수 */
+const MAX_ENTRIES_PER_DAY = 10
 
-export function CalendarView({ year, month, entries, academicEvents, roomFilter }: Props) {
+export function CalendarView({ year, month, entries, academicEvents, roomFilter, periodFilter = null, typeFilter = 'all' }: Props) {
   const daysInMonth = getDaysInMonth(year, month)
   const firstDay = getFirstDayOfWeek(year, month)
 
@@ -66,34 +70,45 @@ export function CalendarView({ year, month, entries, academicEvents, roomFilter 
 
           const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
-          const dayEvents = academicEvents.filter(e => {
-            const start = new Date(e.date).toISOString().slice(0, 10)
-            const end = e.endDate ? new Date(e.endDate).toISOString().slice(0, 10) : start
-            return dateStr >= start && dateStr <= end
-          })
+          const dayEvents = academicEvents.filter((e) => eventCoversDateKey(e, dateStr))
 
           const dayEntries = entries.filter(e => {
-            if (new Date(e.date).toISOString().slice(0, 10) !== dateStr) return false
+            if (toDateKey(new Date(e.date)) !== dateStr) return false
             if (e.status === 'EXCEPTION_CANCELLED') return false
             if (roomFilter && e.roomId !== roomFilter) return false
+            if (periodFilter !== null && e.period.number !== periodFilter) return false
+            if (typeFilter === 'room' && e.roomId === null) return false
+            if (typeFilter === 'specialist' && e.roomId !== null) return false
             return true
           })
 
-          const visibleEntries = dayEntries.slice(0, 3)
+          const visibleEntries = dayEntries.slice(0, MAX_ENTRIES_PER_DAY)
           const extraCount = dayEntries.length - visibleEntries.length
+          const isHoliday = dayEvents.some((e) => !e.allowException)
+          const holidayLabels = dayEvents.filter((e) => !e.allowException)
+          const otherEvents = dayEvents.filter((e) => e.allowException)
 
           return (
             <div
               key={dateStr}
-              className="min-h-[100px] border-r border-b p-1 bg-white"
+              className={`min-h-[120px] border-r border-b p-1 ${isHoliday ? 'bg-red-50' : 'bg-white'}`}
             >
-              <div className="text-xs font-medium text-gray-700 mb-1">{day}</div>
+              <div className={`text-xs font-medium mb-1 ${isHoliday ? 'text-red-600' : 'text-gray-700'}`}>{day}</div>
 
-              {/* Academic event badges */}
-              {dayEvents.map(ev => (
+              {/* 휴업·공휴일 (우선 표시) */}
+              {holidayLabels.map((ev) => (
                 <div
                   key={ev.id}
-                  className="text-[10px] bg-yellow-100 text-yellow-800 rounded px-1 py-0.5 mb-0.5 truncate"
+                  className="text-[10px] rounded px-1 py-0.5 mb-0.5 truncate bg-red-100 text-red-800 font-medium"
+                  title={ev.note ? `${ev.eventType}: ${ev.note}` : ev.eventType}
+                >
+                  {ev.note ? `${ev.eventType}(${ev.note})` : ev.eventType}
+                </div>
+              ))}
+              {otherEvents.map((ev) => (
+                <div
+                  key={ev.id}
+                  className="text-[10px] rounded px-1 py-0.5 mb-0.5 truncate bg-yellow-100 text-yellow-800"
                   title={ev.note ?? ev.eventType}
                 >
                   {ev.note || ev.eventType}
@@ -103,18 +118,18 @@ export function CalendarView({ year, month, entries, academicEvents, roomFilter 
               {/* Entry chips */}
               {visibleEntries.map(e => {
                 const isForce = e.status === 'FORCE_ASSIGNED'
-                const chip = `[${e.period.number}]${e.room?.name ?? e.teacher?.name ?? '전담'}(${e.classGroup.grade.number}-${e.classGroup.number})`
+                const isSpecialist = e.roomId === null
+                const label = formatViewEntryLabel(e)
+                const colorClass = isSpecialist
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-blue-100 text-blue-800'
                 return (
                   <div
                     key={e.id}
-                    className={`text-[10px] rounded px-1 py-0.5 mb-0.5 truncate ${
-                      isForce
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}
-                    title={chip}
+                    className={`text-[10px] rounded px-1 py-0.5 mb-0.5 truncate ${colorClass} ${isForce ? 'ring-1 ring-red-400' : ''} ${isHoliday ? 'opacity-50' : ''}`}
+                    title={isForce ? `[충돌] ${label}` : label}
                   >
-                    {chip}
+                    {label}
                   </div>
                 )
               })}

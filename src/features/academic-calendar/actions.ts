@@ -1,9 +1,23 @@
 'use server'
 
 import { prisma } from '@/lib/db/client'
+import { termContainsDate, parseDateKey, HOLIDAY_EVENT_TYPES } from '@/lib/dates/date-key'
+import { syncHolidaysAcrossTenantTerms as syncHolidays } from '@/lib/academic-calendar/sync-holidays'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
 import type { AcademicEvent } from '@/generated/prisma'
+
+const CALENDAR_PATHS = ['/academic-calendar', '/view', '/calendar', '/list'] as const
+
+function revalidateCalendarPaths() {
+  for (const p of CALENDAR_PATHS) revalidatePath(p)
+}
+
+export async function syncHolidaysAcrossTenantTerms(termId: string): Promise<number> {
+  const n = await syncHolidays(prisma, termId)
+  revalidateCalendarPaths()
+  return n
+}
 
 export async function listAcademicEvents(termId: string): Promise<AcademicEvent[]> {
   return prisma.academicEvent.findMany({ where: { termId }, orderBy: { date: 'asc' } })
@@ -21,11 +35,14 @@ export async function createAcademicEvent(data: {
     const event = await prisma.academicEvent.create({
       data: {
         ...data,
-        date: new Date(data.date),
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        date: parseDateKey(data.date),
+        endDate: data.endDate ? parseDateKey(data.endDate) : null,
       },
     })
-    revalidatePath('/academic-calendar')
+    revalidateCalendarPaths()
+    if ((HOLIDAY_EVENT_TYPES as readonly string[]).includes(data.eventType)) {
+      await syncHolidaysAcrossTenantTerms(data.termId)
+    }
     return { success: true, data: event }
   } catch {
     return { success: false, error: '학사일정 등록 중 오류가 발생했습니다.' }
@@ -41,11 +58,11 @@ export async function updateAcademicEvent(
       where: { id },
       data: {
         ...data,
-        date: new Date(data.date),
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        date: parseDateKey(data.date),
+        endDate: data.endDate ? parseDateKey(data.endDate) : null,
       },
     })
-    revalidatePath('/academic-calendar')
+    revalidateCalendarPaths()
     return { success: true, data: event }
   } catch {
     return { success: false, error: '학사일정 수정 중 오류가 발생했습니다.' }
@@ -55,7 +72,7 @@ export async function updateAcademicEvent(
 export async function deleteAcademicEvent(id: string): Promise<ActionResult> {
   try {
     await prisma.academicEvent.delete({ where: { id } })
-    revalidatePath('/academic-calendar')
+    revalidateCalendarPaths()
     return { success: true, data: undefined }
   } catch {
     return { success: false, error: '학사일정 삭제 중 오류가 발생했습니다.' }
@@ -106,71 +123,29 @@ export async function upsertKeyDates(termId: string, dates: KeyDates): Promise<A
         await prisma.academicEvent.create({ data: { termId, eventType: type, ...data } })
       }
     }
-    revalidatePath('/academic-calendar')
+    revalidateCalendarPaths()
     return { success: true, data: undefined }
   } catch {
     return { success: false, error: '기본 학사일정 저장 중 오류가 발생했습니다.' }
   }
 }
 
-// ---- Public holiday import (한국천문연구원 특일 정보 API) ----
-
-const KASI_BASE = 'http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService'
-
-type KasiItem = { locdate: number | string; dateName: string; isHoliday: string }
-
-async function fetchKasiMonth(year: number, month: number, serviceKey: string): Promise<KasiItem[]> {
-  const url = `${KASI_BASE}/getRestDeInfo?solYear=${year}&solMonth=${String(month).padStart(2, '0')}&ServiceKey=${serviceKey}&_type=json&numOfRows=50`
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = await res.json()
-  const items = json?.response?.body?.items
-  if (!items || items === '') return []
-  const item = items.item
-  if (!item) return []
-  return Array.isArray(item) ? item : [item]
-}
-
-function locdateToIso(locdate: number | string): string {
-  const s = String(locdate)
-  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`
-}
+import { importPublicHolidaysCore } from '@/lib/academic-calendar/import-holidays'
 
 export async function importPublicHolidays(
   termId: string,
-  startYM: string,  // "YYYY-MM"
-  endYM: string     // "YYYY-MM"
+  startYM: string,
+  endYM: string
 ): Promise<ActionResult<{ count: number }>> {
-  const serviceKey = process.env.KASI_API_KEY
-  if (!serviceKey) return { success: false, error: 'API 키가 설정되지 않았습니다.' }
-
   try {
-    const [sy, sm] = startYM.split('-').map(Number)
-    const [ey, em] = endYM.split('-').map(Number)
-    const allItems: KasiItem[] = []
-    let cy = sy, cm = sm
-    while (cy < ey || (cy === ey && cm <= em)) {
-      const items = await fetchKasiMonth(cy, cm, serviceKey)
-      allItems.push(...items)
-      if (cm === 12) { cy++; cm = 1 } else cm++
-    }
-
-    let count = 0
-    for (const item of allItems) {
-      const dateStr = locdateToIso(item.locdate)
-      const date = new Date(dateStr)
-      const existing = await prisma.academicEvent.findFirst({ where: { termId, date } })
-      if (!existing) {
-        await prisma.academicEvent.create({
-          data: { termId, eventType: '공휴일', date, allowException: false, note: item.dateName },
-        })
-        count++
-      }
-    }
-    revalidatePath('/academic-calendar')
+    const { count } = await importPublicHolidaysCore(prisma, termId, startYM, endYM)
+    revalidateCalendarPaths()
     return { success: true, data: { count } }
   } catch (e) {
-    return { success: false, error: `공휴일 정보를 불러오는 중 오류가 발생했습니다. (${e instanceof Error ? e.message : '알 수 없는 오류'})` }
+    return {
+      success: false,
+      error: `공휴일 정보를 불러오는 중 오류가 발생했습니다. (${e instanceof Error ? e.message : '알 수 없는 오류'})`,
+    }
   }
 }
 
@@ -181,17 +156,29 @@ export async function importSpecificDates(
 ): Promise<ActionResult<{ count: number }>> {
   try {
     let count = 0
+    const tenant = await prisma.schoolTerm.findUniqueOrThrow({
+      where: { id: termId },
+      select: { tenantId: true },
+    })
+    const terms = await prisma.schoolTerm.findMany({ where: { tenantId: tenant.tenantId } })
+
     for (const dateStr of dates) {
-      const date = new Date(dateStr)
-      const existing = await prisma.academicEvent.findFirst({ where: { termId, date } })
-      if (!existing) {
-        await prisma.academicEvent.create({
-          data: { termId, eventType: label, date, allowException: false },
+      const date = parseDateKey(dateStr)
+      for (const t of terms) {
+        if (!termContainsDate(t, dateStr)) continue
+        const existing = await prisma.academicEvent.findFirst({
+          where: { termId: t.id, eventType: label, date },
         })
-        count++
+        if (!existing) {
+          await prisma.academicEvent.create({
+            data: { termId: t.id, eventType: label, date, allowException: false },
+          })
+          count++
+        }
       }
     }
-    revalidatePath('/academic-calendar')
+    await syncHolidaysAcrossTenantTerms(termId)
+    revalidateCalendarPaths()
     return { success: true, data: { count } }
   } catch {
     return { success: false, error: '일정 등록 중 오류가 발생했습니다.' }

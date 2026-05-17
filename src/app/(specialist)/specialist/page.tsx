@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
-import { listTerms } from '@/features/terms/actions'
+import { resolveActiveTerm } from '@/features/terms/actions'
+import { ActiveTermBadge } from '@/components/ActiveTermBadge'
 import { listRooms } from '@/features/rooms/actions'
 import { listPeriods, listAllPeriodsDetailed } from '@/features/periods/actions'
 import { listSubjects } from '@/features/subjects/actions'
@@ -31,15 +32,13 @@ export default async function SpecialistPage({
 }) {
   const { week } = await searchParams
 
-  const terms = await listTerms()
-  const activeTerm = terms[0]
+  const refDate = week ? new Date(week) : new Date()
+  const weekDates = getWeekDates(refDate)
+  const activeTerm = await resolveActiveTerm({ date: refDate })
 
   if (!activeTerm) {
     return <div className="text-center py-16 text-gray-500">학기를 등록해 주세요.</div>
   }
-
-  const refDate = week ? new Date(week) : new Date()
-  const weekDates = getWeekDates(refDate)
 
   const [rooms, periods, allPeriods, subjects, teachers, grades, entriesResult, rulesResult] = await Promise.all([
     listRooms(activeTerm.id),
@@ -101,7 +100,10 @@ export default async function SpecialistPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">전담 시간표</h1>
+      <h1 className="text-2xl font-bold">
+        전담 시간표
+        <ActiveTermBadge year={activeTerm.year} semester={activeTerm.semester} />
+      </h1>
 
       <WeekNavigator weekDates={weekDates} prevWeek={prevWeek} nextWeek={nextWeek} />
 
