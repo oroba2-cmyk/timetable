@@ -103,7 +103,7 @@ export function CalendarView({ year, month, entries, academicEvents, roomFilter 
               {/* Entry chips */}
               {visibleEntries.map(e => {
                 const isForce = e.status === 'FORCE_ASSIGNED'
-                const chip = `[${e.period.number}]${e.room?.name ?? ''}(${e.classGroup.grade.number}-${e.classGroup.number})`
+                const chip = `[${e.period.number}]${e.room?.name ?? e.teacher?.name ?? '전담'}(${e.classGroup.grade.number}-${e.classGroup.number})`
                 return (
                   <div
                     key={e.id}

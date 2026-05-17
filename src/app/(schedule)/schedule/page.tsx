@@ -50,8 +50,8 @@ export default async function SchedulePage({
     listSubjects(activeTerm.id),
     listTeachers(activeTerm.id),
     listGrades(activeTerm.id),
-    listEntriesForWeek(activeTerm.id, weekDates[0]),
-    listScheduleRules(activeTerm.id),
+    listEntriesForWeek(activeTerm.id, weekDates[0], 'ROOM'),
+    listScheduleRules(activeTerm.id, 'ROOM'),
   ])
 
   // Full objects for RuleDialog (expects ClassGroup & { grade: Grade })
@@ -86,7 +86,7 @@ export default async function SchedulePage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">주간 시간표 편집기</h1>
+      <h1 className="text-2xl font-bold">특별실 시간표</h1>
 
       {/* Week navigation */}
       <WeekNavigator weekDates={weekDates} prevWeek={prevWeek} nextWeek={nextWeek} />
@@ -120,7 +120,7 @@ export default async function SchedulePage({
         }
         rules={rules.map(rule => ({
           id: rule.id,
-          roomName: rule.room?.name ?? '(미지정)',
+          roomName: rule.room?.name ?? '일반 교실',
           periodNumber: rule.period.number,
           classGradeNumber: rule.classGroup.grade.number,
           classNumber: rule.classGroup.number,
