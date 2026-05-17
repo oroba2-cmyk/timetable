@@ -1,7 +1,7 @@
 import { ScheduleEntry, AcademicEvent, SpecialRoom } from '@/generated/prisma'
 
 type EntryWithRelations = ScheduleEntry & {
-  room: SpecialRoom
+  room: SpecialRoom | null
   classGroup: { number: number; grade: { number: number } }
   subject: { name: string } | null
   teacher: { name: string } | null
@@ -21,10 +21,11 @@ function computeUsageStats(entries: EntryWithRelations[]): UsageStat[] {
   for (const e of entries) {
     if (e.status === 'EXCEPTION_CANCELLED') continue
 
-    if (!map.has(e.roomId)) {
-      map.set(e.roomId, { roomName: e.room.name, dates: new Set(), sessions: 0 })
+    const roomKey = e.roomId ?? '__no_room__'
+    if (!map.has(roomKey)) {
+      map.set(roomKey, { roomName: e.room?.name ?? '(미지정)', dates: new Set(), sessions: 0 })
     }
-    const stat = map.get(e.roomId)!
+    const stat = map.get(roomKey)!
     const dateStr = e.date instanceof Date ? e.date.toISOString().slice(0, 10) : String(e.date).slice(0, 10)
     stat.dates.add(dateStr)
     stat.sessions += 1
@@ -42,8 +43,15 @@ function computeSchoolDays(termStart: Date, termEnd: Date, academicEvents: Acade
   const blocked = new Set<string>()
   for (const e of academicEvents) {
     if (!e.allowException) {
-      const dateStr = e.date instanceof Date ? e.date.toISOString().slice(0, 10) : String(e.date).slice(0, 10)
-      blocked.add(dateStr)
+      const start = new Date(e.date)
+      const end = e.endDate ? new Date(e.endDate) : new Date(e.date)
+      start.setUTCHours(0, 0, 0, 0)
+      end.setUTCHours(0, 0, 0, 0)
+      const cur = new Date(start)
+      while (cur <= end) {
+        blocked.add(cur.toISOString().slice(0, 10))
+        cur.setUTCDate(cur.getUTCDate() + 1)
+      }
     }
   }
 
@@ -171,7 +179,7 @@ export function ListView({ entries, academicEvents, termStart, termEnd, roomFilt
                     <tr key={e.id} className="hover:bg-gray-50">
                       <td className="border border-gray-200 px-3 py-2">{formatDate(e.date)}</td>
                       <td className="border border-gray-200 px-3 py-2">{e.period.number}교시</td>
-                      <td className="border border-gray-200 px-3 py-2">{e.room.name}</td>
+                      <td className="border border-gray-200 px-3 py-2">{e.room?.name ?? '-'}</td>
                       <td className="border border-gray-200 px-3 py-2">
                         {e.classGroup.grade.number}학년 {e.classGroup.number}반
                       </td>

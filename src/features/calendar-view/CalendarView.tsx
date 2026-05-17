@@ -1,7 +1,7 @@
 import { ScheduleEntry, AcademicEvent, SpecialRoom } from '@/generated/prisma'
 
 type EntryWithRelations = ScheduleEntry & {
-  room: SpecialRoom
+  room: SpecialRoom | null
   classGroup: { number: number; grade: { number: number } }
   subject: { name: string } | null
   teacher: { name: string } | null
@@ -66,9 +66,11 @@ export function CalendarView({ year, month, entries, academicEvents, roomFilter 
 
           const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
-          const dayEvents = academicEvents.filter(
-            e => new Date(e.date).toISOString().slice(0, 10) === dateStr
-          )
+          const dayEvents = academicEvents.filter(e => {
+            const start = new Date(e.date).toISOString().slice(0, 10)
+            const end = e.endDate ? new Date(e.endDate).toISOString().slice(0, 10) : start
+            return dateStr >= start && dateStr <= end
+          })
 
           const dayEntries = entries.filter(e => {
             if (new Date(e.date).toISOString().slice(0, 10) !== dateStr) return false
@@ -101,12 +103,7 @@ export function CalendarView({ year, month, entries, academicEvents, roomFilter 
               {/* Entry chips */}
               {visibleEntries.map(e => {
                 const isForce = e.status === 'FORCE_ASSIGNED'
-                const label = [
-                  e.classGroup.grade.number + '학년' + e.classGroup.number + '반',
-                  e.subject?.name,
-                ]
-                  .filter(Boolean)
-                  .join(' ')
+                const chip = `[${e.period.number}]${e.room?.name ?? ''}(${e.classGroup.grade.number}-${e.classGroup.number})`
                 return (
                   <div
                     key={e.id}
@@ -115,9 +112,9 @@ export function CalendarView({ year, month, entries, academicEvents, roomFilter 
                         ? 'bg-red-100 text-red-800'
                         : 'bg-blue-100 text-blue-800'
                     }`}
-                    title={label}
+                    title={chip}
                   >
-                    {e.period.number}교시 {label}
+                    {chip}
                   </div>
                 )
               })}

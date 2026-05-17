@@ -84,10 +84,9 @@ export async function createReservation(data: {
 
     await prisma.scheduleEntry.upsert({
       where: {
-        date_periodId_roomId_classId: {
+        date_periodId_classId: {
           date: new Date(data.date),
           periodId: data.periodId,
-          roomId: data.roomId,
           classId: data.classId,
         },
       },
