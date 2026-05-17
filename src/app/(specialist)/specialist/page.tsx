@@ -77,14 +77,19 @@ export default async function SpecialistPage({
   nextWeekDate.setDate(nextWeekDate.getDate() + 7)
   const nextWeek = nextWeekDate.toISOString().slice(0, 10)
 
-  // listTeachers returns plain Teacher[] with no subjects relation.
-  // TeacherSidebar expects { id, name, subjects: { name: string }[] }.
-  // Map teachers with an empty subjects array.
-  const specialistTeachers = teachers.map(t => ({
-    id: t.id,
-    name: t.name,
-    subjects: [] as { name: string }[],
-  }))
+  // Build specialist teachers from subjects' teacherSubjects relation.
+  // Only teachers registered as 담당교사 in subject management appear here.
+  const specialistTeacherMap = new Map<string, { id: string; name: string; subjects: { name: string }[] }>()
+  for (const subject of subjects) {
+    for (const ts of subject.teacherSubjects) {
+      const t = ts.teacher
+      if (!specialistTeacherMap.has(t.id)) {
+        specialistTeacherMap.set(t.id, { id: t.id, name: t.name, subjects: [] })
+      }
+      specialistTeacherMap.get(t.id)!.subjects.push({ name: subject.name })
+    }
+  }
+  const specialistTeachers = [...specialistTeacherMap.values()].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="space-y-6">
