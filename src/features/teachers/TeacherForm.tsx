@@ -7,33 +7,23 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { createTeacher, updateTeacher } from './actions'
 import { TEACHER_TYPE_LABELS } from '@/types'
-import type { Subject, Teacher, TeacherType } from '@/generated/prisma'
-
-type TeacherWithSubjects = Teacher & { teacherSubjects: { subjectId: string; subject: Subject }[] }
+import type { Teacher, TeacherType } from '@/generated/prisma'
 
 interface Props {
   termId: string
-  teacher?: TeacherWithSubjects
-  subjects: Subject[]
+  teacher?: Teacher
   trigger: React.ReactNode
 }
 
-export function TeacherForm({ termId, teacher, subjects, trigger }: Props) {
+export function TeacherForm({ termId, teacher, trigger }: Props) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
 
-  const existingSubjectIds = teacher?.teacherSubjects.map((ts) => ts.subjectId) ?? []
-
   async function handleSubmit(fd: FormData) {
-    const subjectIds = subjects
-      .filter((s) => fd.get(`subject_${s.id}`) === 'on')
-      .map((s) => s.id)
-
     const data = {
       termId,
       name: fd.get('name') as string,
       type: fd.get('type') as TeacherType,
-      subjectIds,
     }
     const result = teacher ? await updateTeacher(teacher.id, data) : await createTeacher(data)
     if (result.success) {
@@ -69,27 +59,6 @@ export function TeacherForm({ termId, teacher, subjects, trigger }: Props) {
               ))}
             </select>
           </div>
-          {subjects.length > 0 && (
-            <div>
-              <Label>담당 과목</Label>
-              <div className="mt-1 space-y-1">
-                {subjects.map((subject) => (
-                  <div key={subject.id} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`subject_${subject.id}`}
-                      name={`subject_${subject.id}`}
-                      defaultChecked={existingSubjectIds.includes(subject.id)}
-                      className="size-4 rounded border-input"
-                    />
-                    <label htmlFor={`subject_${subject.id}`} className="text-sm">
-                      {subject.name}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <Button type="submit" className="w-full">
             {teacher ? '수정' : '추가'}

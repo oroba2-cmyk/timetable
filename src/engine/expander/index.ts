@@ -13,6 +13,7 @@ export interface RuleInput {
 
 export interface AcademicEventInput {
   date: Date
+  endDate?: Date | null
   allowException: boolean
 }
 
@@ -44,7 +45,12 @@ function isSameDayUTC(a: Date, b: Date): boolean {
 }
 
 function isBlocked(date: Date, events: AcademicEventInput[]): boolean {
-  return events.some((e) => isSameDayUTC(utcDateOnly(e.date), date) && !e.allowException)
+  return events.some((e) => {
+    if (e.allowException) return false
+    const start = utcDateOnly(e.date)
+    const end = e.endDate ? utcDateOnly(e.endDate) : start
+    return date >= start && date <= end
+  })
 }
 
 export function expandRule(

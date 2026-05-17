@@ -12,7 +12,6 @@ export type {
   ScheduleRule,
   ScheduleEntry,
   Reservation,
-  SubjectType,
   TeacherType,
   RepeatUnit,
   EndType,
@@ -33,13 +32,9 @@ export const DAY_LABELS: Record<DayOfWeek, string> = {
 export const TEACHER_TYPE_LABELS: Record<string, string> = {
   HOMEROOM: '담임',
   SPECIALIZED: '전담',
-  CONCURRENT: '겸임',
+  TEMP_HOMEROOM: '임시담임',
 }
 
-export const SUBJECT_TYPE_LABELS: Record<string, string> = {
-  SPECIALIZED: '전담',
-  GENERAL: '일반',
-}
 
 export const REPEAT_UNIT_LABELS: Record<string, string> = {
   DAY: '일',

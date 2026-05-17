@@ -56,7 +56,7 @@ export function PeriodForm({ termId, period, nextNumber, trigger }: Props) {
         <DialogHeader>
           <DialogTitle>{period ? '교시 수정' : '교시 추가'}</DialogTitle>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form key={period?.id ?? 'new'} action={handleSubmit} className="space-y-4">
           {!period && (
             <div>
               <Label htmlFor="number">교시 번호</Label>

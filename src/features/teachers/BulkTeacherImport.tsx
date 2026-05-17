@@ -10,13 +10,13 @@ interface Props {
 
 export function BulkTeacherImport({ termId }: Props) {
   const [text, setText] = useState('')
-  const [type, setType] = useState<'HOMEROOM' | 'SPECIALIZED' | 'CONCURRENT'>('HOMEROOM')
+  const [type, setType] = useState<'HOMEROOM' | 'SPECIALIZED' | 'TEMP_HOMEROOM'>('HOMEROOM')
+  const [duplicateAction, setDuplicateAction] = useState<'skip' | 'overwrite' | 'add'>('skip')
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function parseNames(raw: string): string[] {
-    // Split by newlines, commas, or semicolons; trim each
     return raw.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
   }
 
@@ -25,9 +25,13 @@ export function BulkTeacherImport({ termId }: Props) {
     if (names.length === 0) { setMessage('이름을 입력해주세요.'); return }
     setPending(true)
     setMessage('')
-    const result = await bulkCreateTeachers(termId, names, type)
+    const result = await bulkCreateTeachers(termId, names, type, duplicateAction)
     if (result.success) {
-      setMessage(`${result.data.created}명 추가 완료${result.data.skipped > 0 ? `, ${result.data.skipped}명 중복 건너뜀` : ''}`)
+      const parts = []
+      if (result.data.created > 0) parts.push(`${result.data.created}명 추가`)
+      if (result.data.overwritten > 0) parts.push(`${result.data.overwritten}명 덮어쓰기`)
+      if (result.data.skipped > 0) parts.push(`${result.data.skipped}명 건너뜀`)
+      setMessage(parts.join(', ') + ' 완료')
       setText('')
     } else {
       setMessage(result.error)
@@ -38,12 +42,8 @@ export function BulkTeacherImport({ termId }: Props) {
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
-    // Try to parse as plain text (works for .txt, .csv first column)
     const raw = await file.text()
-    // For CSV: take first column of each row
     const lines = raw.split('\n').map(line => line.split(',')[0].trim()).filter(Boolean)
-    // Skip header if first line looks like a header (contains 이름 or name)
     const firstLine = lines[0]?.toLowerCase() ?? ''
     const names = (firstLine.includes('이름') || firstLine.includes('name'))
       ? lines.slice(1)
@@ -60,17 +60,31 @@ export function BulkTeacherImport({ termId }: Props) {
       </p>
 
       <div className="space-y-3">
-        <div>
-          <Label>교사 유형</Label>
-          <select
-            value={type}
-            onChange={e => setType(e.target.value as typeof type)}
-            className="w-full border rounded px-2 py-1.5 text-sm mt-1"
-          >
-            <option value="HOMEROOM">담임</option>
-            <option value="SPECIALIZED">전담</option>
-            <option value="CONCURRENT">겸임</option>
-          </select>
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <Label>교사 유형</Label>
+            <select
+              value={type}
+              onChange={e => setType(e.target.value as typeof type)}
+              className="w-full border rounded px-2 py-1.5 text-sm mt-1"
+            >
+              <option value="HOMEROOM">담임</option>
+              <option value="SPECIALIZED">전담</option>
+              <option value="TEMP_HOMEROOM">임시담임</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <Label>동명이인 처리</Label>
+            <select
+              value={duplicateAction}
+              onChange={e => setDuplicateAction(e.target.value as typeof duplicateAction)}
+              className="w-full border rounded px-2 py-1.5 text-sm mt-1"
+            >
+              <option value="skip">건너뜀 (기존 유지)</option>
+              <option value="overwrite">덮어쓰기 (유형 변경)</option>
+              <option value="add">중복 추가</option>
+            </select>
+          </div>
         </div>
 
         <div>

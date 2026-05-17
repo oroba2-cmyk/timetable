@@ -26,7 +26,7 @@ interface Props {
 export function RoomForm({ termId, room, trigger }: Props) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
-  const [selectedGrades, setSelectedGrades] = useState<number[]>(room?.grades ?? [])
+  const [selectedGrades, setSelectedGrades] = useState<number[]>(room?.grades ?? [1, 2, 3, 4, 5, 6])
   const [hasOther, setHasOther] = useState(!!room?.otherGradeNote)
 
   function toggleGrade(grade: number) {

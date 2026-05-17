@@ -52,6 +52,28 @@ export async function updateRoom(
   }
 }
 
+export async function duplicateRoom(id: string): Promise<ActionResult<SpecialRoom>> {
+  try {
+    const source = await prisma.specialRoom.findUniqueOrThrow({ where: { id } })
+    const room = await prisma.specialRoom.create({
+      data: {
+        termId: source.termId,
+        name: source.name + ' (복사본)',
+        roomType: source.roomType,
+        location: source.location,
+        grades: source.grades,
+        otherGradeNote: source.otherGradeNote,
+        capacity: source.capacity,
+        note: source.note,
+      },
+    })
+    revalidatePath('/rooms')
+    return { success: true, data: room }
+  } catch {
+    return { success: false, error: '특별실 복제 중 오류가 발생했습니다.' }
+  }
+}
+
 export async function deleteRoom(id: string): Promise<ActionResult> {
   try {
     await prisma.specialRoom.delete({ where: { id } })

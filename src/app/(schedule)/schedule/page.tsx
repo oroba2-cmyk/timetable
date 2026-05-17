@@ -72,6 +72,9 @@ export default async function SchedulePage({
     },
     status: e.status,
     teacherId: e.teacherId ?? null,
+    subjectId: null,
+    subjectName: null,
+    teacherName: null,
   }))
 
   const rules = rulesResult.success ? rulesResult.data : []

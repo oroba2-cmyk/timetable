@@ -18,9 +18,8 @@ export function ClassForm({ termId, teachers, trigger }: Props) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
 
-  // Only HOMEROOM and CONCURRENT teachers can be homeroom teachers
   const eligibleTeachers = teachers.filter(
-    (t) => t.type === 'HOMEROOM' || t.type === 'CONCURRENT'
+    (t) => t.type === 'HOMEROOM' || t.type === 'TEMP_HOMEROOM'
   )
 
   async function handleSubmit(fd: FormData) {

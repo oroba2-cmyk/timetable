@@ -20,8 +20,10 @@ interface Props {
   open: boolean
   onClose: () => void
   termId: string
-  teacherId: string
-  teacherName: string
+  subjectId: string
+  subjectName: string
+  teacherId: string | null
+  teacherName: string | null
   periodId: string
   date: string     // YYYY-MM-DD
   classes: ClassData[]
@@ -32,7 +34,7 @@ interface Props {
 const DAY_KO = ['월', '화', '수', '목', '금', '토', '일']
 
 export function SpecialistAssignDialog({
-  open, onClose, termId, teacherId, teacherName, periodId, date, classes, availableRooms, onAssigned,
+  open, onClose, termId, subjectId, subjectName, teacherId, teacherName, periodId, date, classes, availableRooms, onAssigned,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedRoomId, setSelectedRoomId] = useState<string>('')
@@ -67,7 +69,7 @@ export function SpecialistAssignDialog({
       let created = 0, conflicts = 0
       for (const classId of selected) {
         const result = await quickAssignSpecialist({
-          termId, teacherId, classId, periodId, date,
+          termId, subjectId, teacherId: teacherId ?? undefined, classId, periodId, date,
           roomId: selectedRoomId || undefined,
         })
         if (!result.success) { setError(result.error); return }
@@ -85,7 +87,9 @@ export function SpecialistAssignDialog({
     <Dialog open={open} onOpenChange={v => { if (!v) { setSelected(new Set()); setError(''); onClose() } }}>
       <DialogContent className="max-w-sm max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{teacherName} 전담 배정 — {dateLabel}</DialogTitle>
+          <DialogTitle>
+            {subjectName}{teacherName ? ` (${teacherName})` : ''} 전담 배정 — {dateLabel}
+          </DialogTitle>
         </DialogHeader>
 
         {/* Room picker (optional) */}

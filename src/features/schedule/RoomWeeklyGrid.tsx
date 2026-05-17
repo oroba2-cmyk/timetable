@@ -11,6 +11,9 @@ export interface RoomEntryData {
   classGroup: { number: number; grade: { number: number } }
   status: string
   teacherId: string | null
+  subjectId: string | null
+  subjectName: string | null
+  teacherName: string | null
 }
 
 export interface GridPeriodRow {
@@ -142,7 +145,7 @@ function EntryChip({
   const isConflict = entry.status === 'FORCE_ASSIGNED'
 
   const classLabel = `${entry.classGroup.grade.number}-${entry.classGroup.number}반`
-  const displayLabel = roomLabel ? `${roomLabel} ${classLabel}` : classLabel
+  const topLabel = roomLabel ? `${roomLabel} ${classLabel}` : classLabel
 
   return (
     <div className="relative inline-block w-full">
@@ -156,7 +159,13 @@ function EntryChip({
         }`}
         onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
       >
-        {displayLabel}
+        {entry.subjectName && (
+          <div className="font-semibold">{entry.subjectName}</div>
+        )}
+        {entry.teacherName && (
+          <div className="opacity-75">{entry.teacherName}</div>
+        )}
+        <div className={entry.subjectName ? 'opacity-75' : ''}>{topLabel}</div>
       </div>
       {menuOpen && (
         <>

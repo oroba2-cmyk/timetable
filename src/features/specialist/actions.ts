@@ -8,7 +8,8 @@ import { ActionResult } from '@/types'
 
 export async function quickAssignSpecialist(data: {
   termId: string
-  teacherId: string
+  subjectId: string
+  teacherId?: string
   classId: string
   periodId: string
   date: string          // YYYY-MM-DD
@@ -30,7 +31,8 @@ export async function quickAssignSpecialist(data: {
         termId: data.termId,
         roomId: data.roomId ?? null,
         classId: data.classId,
-        teacherId: data.teacherId,
+        subjectId: data.subjectId,
+        teacherId: data.teacherId ?? null,
         periodId: data.periodId,
         startDate: entryDate,
         repeatInterval: 1,
@@ -47,11 +49,13 @@ export async function quickAssignSpecialist(data: {
       data.roomId
         ? prisma.roomUnavailability.findMany({ where: { roomId: data.roomId } })
         : Promise.resolve([]),
-      prisma.teacherUnavailability.findMany({ where: { teacherId: data.teacherId } }),
+      data.teacherId
+        ? prisma.teacherUnavailability.findMany({ where: { teacherId: data.teacherId } })
+        : Promise.resolve([]),
     ])
 
     const conflictResult = checkConflict({
-      entry: { date: entryDate, periodId: data.periodId, roomId: data.roomId ?? null, classId: data.classId, teacherId: data.teacherId },
+      entry: { date: entryDate, periodId: data.periodId, roomId: data.roomId ?? null, classId: data.classId, teacherId: data.teacherId ?? null },
       existing: existingEntries as EntryLike[],
       room: room ? { id: room.id, capacity: room.capacity } : null,
       roomUnavailabilities: roomUnavailabilities.map(u => ({ dayOfWeek: u.dayOfWeek, periodId: u.periodId })),
@@ -68,13 +72,15 @@ export async function quickAssignSpecialist(data: {
         periodId: data.periodId,
         roomId: data.roomId ?? null,
         classId: data.classId,
-        teacherId: data.teacherId,
+        subjectId: data.subjectId,
+        teacherId: data.teacherId ?? null,
         source: 'RULE',
         sourceRuleId: rule.id,
         status,
       },
       update: {
-        teacherId: data.teacherId,
+        subjectId: data.subjectId,
+        teacherId: data.teacherId ?? null,
         roomId: data.roomId ?? null,
         sourceRuleId: rule.id,
         source: 'RULE',

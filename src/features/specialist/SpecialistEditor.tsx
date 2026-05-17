@@ -2,20 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { TeacherSidebar } from './TeacherSidebar'
+import { SubjectSidebar, type SubjectData } from './SubjectSidebar'
 import { SpecialistAssignDialog } from './SpecialistAssignDialog'
 import { RoomWeeklyGrid } from '@/features/schedule/RoomWeeklyGrid'
 import type { RoomEntryData, GridPeriodRow } from '@/features/schedule/RoomWeeklyGrid'
 import { RuleListClient, type RuleItem } from '@/features/schedule/RuleListClient'
-import { RuleDialog } from '@/features/schedule/RuleDialog'
 import { cancelScheduleEntry, deleteScheduleRule } from '@/features/schedule/actions'
 import type { SpecialRoom, ClassGroup, Grade, Subject, Teacher, Period } from '@/generated/prisma'
-
-interface TeacherData {
-  id: string
-  name: string
-  subjects: { name: string }[]
-}
 
 interface AllPeriodDetailed {
   id: string
@@ -39,7 +32,7 @@ interface RoomData {
 
 interface Props {
   termId: string
-  teachers: TeacherData[]
+  specialistSubjects: SubjectData[]
   allPeriods: AllPeriodDetailed[]
   classes: ClassData[]
   rooms: RoomData[]
@@ -99,31 +92,31 @@ function computePeriodRows(allPeriods: AllPeriodDetailed[], gradeNumbers: number
 }
 
 export function SpecialistEditor({
-  termId, teachers, allPeriods, classes, rooms, weekDates, entries, rules,
+  termId, specialistSubjects, allPeriods, classes, rooms, weekDates, entries, rules,
   fullRooms, fullClasses, subjects, allTeachers, rawPeriods, headerButton,
 }: Props) {
   const router = useRouter()
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(teachers[0]?.id ?? null)
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(specialistSubjects[0]?.id ?? null)
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null)
   const [pickerCell, setPickerCell] = useState<{ date: string; periodId: string } | null>(null)
   const [, startTransition] = useTransition()
 
   const gradeNumbers = [...new Set(classes.map(c => c.grade.number))].sort((a, b) => a - b)
-  const selectedTeacher = teachers.find(t => t.id === selectedTeacherId) ?? null
+  const selectedSubject = specialistSubjects.find(s => s.id === selectedSubjectId) ?? null
 
   const gridPeriods = selectedGrade !== null
     ? computePeriodRows(allPeriods, [selectedGrade])
     : computePeriodRows(allPeriods, [])
 
   const filteredEntries = entries.filter(e =>
-    (selectedTeacherId === null || e.teacherId === selectedTeacherId) &&
+    (selectedSubjectId === null || e.subjectId === selectedSubjectId) &&
     (selectedGrade === null || e.classGroup.grade.number === selectedGrade)
   )
 
   const assignmentCounts: Record<string, number> = {}
   for (const entry of entries) {
-    if (entry.teacherId) {
-      assignmentCounts[entry.teacherId] = (assignmentCounts[entry.teacherId] ?? 0) + 1
+    if (entry.subjectId) {
+      assignmentCounts[entry.subjectId] = (assignmentCounts[entry.subjectId] ?? 0) + 1
     }
   }
 
@@ -149,10 +142,10 @@ export function SpecialistEditor({
     </div>
 
     <div className="flex border rounded-lg overflow-hidden min-h-80">
-      <TeacherSidebar
-        teachers={teachers}
-        selectedTeacherId={selectedTeacherId}
-        onSelect={setSelectedTeacherId}
+      <SubjectSidebar
+        subjects={specialistSubjects}
+        selectedSubjectId={selectedSubjectId}
+        onSelect={setSelectedSubjectId}
         assignmentCounts={assignmentCounts}
       />
 
@@ -192,25 +185,27 @@ export function SpecialistEditor({
             periods={gridPeriods}
             entries={filteredEntries}
             onCellClick={(date, periodId) => {
-              if (!selectedTeacherId) return
+              if (!selectedSubjectId) return
               setPickerCell({ date, periodId })
             }}
             onEntryAction={handleEntryAction}
             showRoom={true}
             rooms={rooms}
-            readOnly={!selectedTeacherId}
+            readOnly={!selectedSubjectId}
           />
         </div>
       </div>
     </div>
 
-    {pickerCell && selectedTeacherId && selectedTeacher && (
+    {pickerCell && selectedSubjectId && selectedSubject && (
       <SpecialistAssignDialog
         open={true}
         onClose={() => setPickerCell(null)}
         termId={termId}
-        teacherId={selectedTeacherId}
-        teacherName={selectedTeacher.name}
+        subjectId={selectedSubjectId}
+        subjectName={selectedSubject.name}
+        teacherId={selectedSubject.teacherId}
+        teacherName={selectedSubject.teacherName}
         periodId={pickerCell.periodId}
         date={pickerCell.date}
         classes={selectedGrade !== null ? classes.filter(c => c.grade.number === selectedGrade) : classes}
@@ -229,7 +224,7 @@ export function SpecialistEditor({
         teachers={allTeachers}
         periods={rawPeriods}
         rules={rules.filter(rule =>
-          (selectedTeacherId === null || rule.teacherId === selectedTeacherId) &&
+          (selectedSubjectId === null || rule.edit.subjectId === selectedSubjectId) &&
           (selectedGrade === null || rule.classGradeNumber === selectedGrade)
         )}
       />

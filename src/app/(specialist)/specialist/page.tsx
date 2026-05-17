@@ -14,12 +14,12 @@ import { Button } from '@/components/ui/button'
 
 function getWeekDates(referenceDate: Date): string[] {
   const d = new Date(referenceDate)
-  const day = d.getDay()
+  const day = d.getUTCDay()
   const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
+  d.setUTCDate(d.getUTCDate() + diff)
   return Array.from({ length: 5 }, (_, i) => {
     const date = new Date(d)
-    date.setDate(date.getDate() + i)
+    date.setUTCDate(date.getUTCDate() + i)
     return date.toISOString().slice(0, 10)
   })
 }
@@ -55,6 +55,12 @@ export default async function SpecialistPage({
   const fullClasses = grades.flatMap(g => g.classGroups.map(c => ({ ...c, grade: g })))
   const classes = fullClasses.map(c => ({ id: c.id, number: c.number, grade: { number: c.grade.number } }))
 
+  // Build subject lookup maps for enriching entry/rule display
+  const subjectNameMap = new Map(subjects.map(s => [s.id, s.name]))
+  const subjectTeacherMap = new Map(
+    subjects.map(s => [s.id, s.teacherSubjects[0]?.teacher ?? null])
+  )
+
   const rawEntries = entriesResult.success ? entriesResult.data : []
   const entries = rawEntries.map(e => ({
     id: e.id,
@@ -65,31 +71,33 @@ export default async function SpecialistPage({
     classGroup: { number: e.classGroup.number, grade: { number: e.classGroup.grade.number } },
     status: e.status,
     teacherId: e.teacherId,
+    subjectId: e.subjectId,
+    subjectName: e.subjectId ? (subjectNameMap.get(e.subjectId) ?? null) : null,
+    teacherName: e.teacherId ? (e.teacher?.name ?? null) : null,
   }))
 
   const rules = rulesResult.success ? rulesResult.data : []
 
+  // Specialist subjects: subjects with at least one 담당교사
+  const specialistSubjects = subjects
+    .filter(s => s.teacherSubjects.length > 0)
+    .map(s => {
+      const firstTeacher = s.teacherSubjects[0]?.teacher ?? null
+      return {
+        id: s.id,
+        name: s.name,
+        teacherId: firstTeacher?.id ?? null,
+        teacherName: firstTeacher?.name ?? null,
+      }
+    })
+
   const prevWeekDate = new Date(weekDates[0])
-  prevWeekDate.setDate(prevWeekDate.getDate() - 7)
+  prevWeekDate.setUTCDate(prevWeekDate.getUTCDate() - 7)
   const prevWeek = prevWeekDate.toISOString().slice(0, 10)
 
   const nextWeekDate = new Date(weekDates[0])
-  nextWeekDate.setDate(nextWeekDate.getDate() + 7)
+  nextWeekDate.setUTCDate(nextWeekDate.getUTCDate() + 7)
   const nextWeek = nextWeekDate.toISOString().slice(0, 10)
-
-  // Build specialist teachers from subjects' teacherSubjects relation.
-  // Only teachers registered as 담당교사 in subject management appear here.
-  const specialistTeacherMap = new Map<string, { id: string; name: string; subjects: { name: string }[] }>()
-  for (const subject of subjects) {
-    for (const ts of subject.teacherSubjects) {
-      const t = ts.teacher
-      if (!specialistTeacherMap.has(t.id)) {
-        specialistTeacherMap.set(t.id, { id: t.id, name: t.name, subjects: [] })
-      }
-      specialistTeacherMap.get(t.id)!.subjects.push({ name: subject.name })
-    }
-  }
-  const specialistTeachers = [...specialistTeacherMap.values()].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="space-y-6">
@@ -99,7 +107,7 @@ export default async function SpecialistPage({
 
       <SpecialistEditor
         termId={activeTerm.id}
-        teachers={specialistTeachers}
+        specialistSubjects={specialistSubjects}
         allPeriods={allPeriods.map(p => ({
           id: p.id, number: p.number, gradeNumber: p.gradeNumber,
           startTime: p.startTime, endTime: p.endTime, label: p.label ?? null,

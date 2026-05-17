@@ -1,0 +1,1 @@
+ALTER TABLE "Subject" ADD COLUMN "grades" INTEGER[] NOT NULL DEFAULT '{}';
