@@ -10,6 +10,7 @@ export interface RoomEntryData {
   sourceRuleId: string | null
   classGroup: { number: number; grade: { number: number } }
   status: string
+  teacherId: string | null
 }
 
 export interface GridPeriodRow {

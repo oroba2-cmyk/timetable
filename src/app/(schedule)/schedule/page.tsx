@@ -71,6 +71,7 @@ export default async function SchedulePage({
       grade: { number: e.classGroup.grade.number },
     },
     status: e.status,
+    teacherId: e.teacherId ?? null,
   }))
 
   const rules = rulesResult.success ? rulesResult.data : []
@@ -125,6 +126,7 @@ export default async function SchedulePage({
           classNumber: rule.classGroup.number,
           subjectName: rule.subject?.name ?? null,
           teacherName: rule.teacher?.name ?? null,
+          teacherId: rule.teacherId ?? null,
           startDate: new Date(rule.startDate).toISOString().slice(0, 10),
           repeatInterval: rule.repeatInterval,
           repeatUnit: rule.repeatUnit as 'DAY' | 'WEEK' | 'MONTH',
