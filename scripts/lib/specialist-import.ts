@@ -59,6 +59,7 @@ export async function importSpecialistSchedule(
       classId,
       subjectId,
       teacherId,
+      roomId: null,
       grade: a.grade,
       periodNum: a.period,
       dayIndex: a.dayIndex,

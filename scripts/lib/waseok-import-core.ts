@@ -148,7 +148,7 @@ export async function createWeeklyRule(
   prisma: PrismaClient,
   ctx: ImportContext,
   opts: {
-    roomId?: string
+    roomId?: string | null
     classId: string
     subjectId?: string
     teacherId?: string
