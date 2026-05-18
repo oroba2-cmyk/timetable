@@ -13,11 +13,15 @@ export function anonymizeName(
   }
   if (teacher.type === 'SPECIALIZED' && subjectNames[0]) {
     const s = subjectNames[0]
-    const g = subjectNames.find((n) => /(\d)학년/.test(n))
-    const gn = g ? Number(g.match(/(\d)/)?.[1] ?? 0) : 0
-    const prefix = gn ? (KO[gn] ?? String(gn)) : ''
-    if (s.includes('과학')) return `${prefix}과학`
-    return `${prefix}${s.slice(0, 3)}`
+    const NUM_SURNAME: Record<string, string> = {
+      '1': '한', '2': '이', '3': '삼', '4': '사', '5': '오', '6': '육',
+    }
+    const numMatch = s.match(/^(\d)/)
+    const surname = numMatch ? (NUM_SURNAME[numMatch[1]] ?? numMatch[1]) : '김'
+    if (s.includes('과학')) return `${surname}과학`
+    if (s.includes('영어')) return `${surname}영어`
+    if (s.includes('놀이') || s.includes('즐')) return `${surname}놀이`
+    return `${surname}${s.replace(/^\d/, '').slice(0, 2)}`
   }
   return `샘${teacher.id.slice(-4)}`
 }
