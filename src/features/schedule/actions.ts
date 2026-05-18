@@ -30,7 +30,7 @@ export async function listScheduleRules(
       orderBy: { createdAt: 'asc' },
     })
     const rules = entryType === 'ROOM'       ? allRules.filter(r => r.roomId !== null)
-                : entryType === 'SPECIALIST' ? allRules.filter(r => r.roomId === null)
+                : entryType === 'SPECIALIST' ? allRules.filter(r => r.teacherId !== null)
                 : allRules
     return { success: true as const, data: rules }
   } catch (err) {
@@ -63,7 +63,7 @@ export async function listEntriesForWeek(
       orderBy: [{ date: 'asc' }, { period: { number: 'asc' } }],
     })
     const entries = entryType === 'ROOM'       ? allEntries.filter(e => e.roomId !== null)
-                 : entryType === 'SPECIALIST' ? allEntries.filter(e => e.roomId === null)
+                 : entryType === 'SPECIALIST' ? allEntries.filter(e => e.teacherId !== null)
                  : allEntries
     return { success: true as const, data: entries }
   } catch (err) {
