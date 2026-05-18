@@ -31,7 +31,6 @@ function bucketKey(e: CellEntryLike): string {
   return [
     e.roomId ?? '',
     e.subjectId ?? '',
-    e.teacherId ?? '',
     e.status,
     e.subjectName ?? '',
     e.teacherName ?? '',

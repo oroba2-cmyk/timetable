@@ -3,6 +3,74 @@ import { expandRule } from '../../src/engine/expander'
 
 const KO = ['', '일', '이', '삼', '사', '오', '육'] as const
 
+const GRADE_SURNAMES: Record<number, string> = { 1: '한', 2: '이', 3: '삼', 4: '사', 5: '오', 6: '육' }
+const FALLBACK_SURNAMES = ['김', '박', '최', '정', '강', '조', '윤', '장', '임', '류']
+
+function classifySpecialized(subjectNames: string[]): { type: string; gradeNum: number } {
+  const s = subjectNames[0] ?? ''
+  const type = s.includes('과학') ? '과학'
+    : s.includes('영어') ? '영어'
+    : s.includes('놀이') || s.includes('즐') ? '놀이'
+    : s.replace(/^\d/, '').slice(0, 2)
+  const numMatch = s.match(/^(\d)/)
+  return { type, gradeNum: numMatch ? Number(numMatch[1]) : 0 }
+}
+
+// 전담교사 목록에서 동명이인 없이 고유한 이름을 배정한다.
+// 같은 과목 조합(지문)을 가진 교사는 학기가 달라도 같은 이름을 받는다.
+export function assignSpecializedNames(
+  teachers: Array<{ id: string; subjectNames: string[] }>
+): Map<string, string> {
+  const result = new Map<string, string>()
+  const usedNames = new Set<string>()
+
+  // 과목 지문(fingerprint) 기준으로 동일인 그룹화
+  const fpToIds = new Map<string, string[]>()
+  const fpToSubjects = new Map<string, string[]>()
+  for (const t of teachers) {
+    const fp = [...t.subjectNames].sort().join('|')
+    if (!fpToIds.has(fp)) { fpToIds.set(fp, []); fpToSubjects.set(fp, t.subjectNames) }
+    fpToIds.get(fp)!.push(t.id)
+  }
+
+  // 과목 타입별 그룹화 → 학년순 정렬 → 고유 이름 배정
+  type Group = { fp: string; ids: string[]; type: string; gradeNum: number }
+  const groups: Group[] = []
+  for (const [fp, ids] of fpToIds) {
+    const { type, gradeNum } = classifySpecialized(fpToSubjects.get(fp)!)
+    groups.push({ fp, ids, type, gradeNum })
+  }
+
+  const byType = new Map<string, Group[]>()
+  for (const g of groups) {
+    if (!byType.has(g.type)) byType.set(g.type, [])
+    byType.get(g.type)!.push(g)
+  }
+
+  for (const typeGroups of byType.values()) {
+    typeGroups.sort((a, b) =>
+      a.gradeNum !== b.gradeNum
+        ? a.gradeNum - b.gradeNum
+        : fpToSubjects.get(a.fp)!.join(',').localeCompare(fpToSubjects.get(b.fp)!.join(','))
+    )
+    for (const { fp, ids, type, gradeNum } of typeGroups) {
+      const preferred = gradeNum ? GRADE_SURNAMES[gradeNum] : null
+      let chosen = ''
+      if (preferred && !usedNames.has(`${preferred}${type}`)) {
+        chosen = `${preferred}${type}`
+      } else {
+        for (const s of FALLBACK_SURNAMES) {
+          if (!usedNames.has(`${s}${type}`)) { chosen = `${s}${type}`; break }
+        }
+      }
+      usedNames.add(chosen)
+      for (const id of ids) result.set(id, chosen)
+    }
+  }
+
+  return result
+}
+
 export function anonymizeName(
   teacher: Teacher,
   homeroom: { gradeNumber: number; classNumber: number } | undefined,
@@ -12,16 +80,9 @@ export function anonymizeName(
     return `${KO[homeroom.gradeNumber] ?? homeroom.gradeNumber}${KO[homeroom.classNumber] ?? homeroom.classNumber}샘`
   }
   if (teacher.type === 'SPECIALIZED' && subjectNames[0]) {
-    const s = subjectNames[0]
-    const NUM_SURNAME: Record<string, string> = {
-      '1': '한', '2': '이', '3': '삼', '4': '사', '5': '오', '6': '육',
-    }
-    const numMatch = s.match(/^(\d)/)
-    const surname = numMatch ? (NUM_SURNAME[numMatch[1]] ?? numMatch[1]) : '김'
-    if (s.includes('과학')) return `${surname}과학`
-    if (s.includes('영어')) return `${surname}영어`
-    if (s.includes('놀이') || s.includes('즐')) return `${surname}놀이`
-    return `${surname}${s.replace(/^\d/, '').slice(0, 2)}`
+    const { type, gradeNum } = classifySpecialized(subjectNames)
+    const surname = gradeNum ? (GRADE_SURNAMES[gradeNum] ?? '김') : '김'
+    return `${surname}${type}`
   }
   return `샘${teacher.id.slice(-4)}`
 }
@@ -45,7 +106,7 @@ export async function cloneTermWithinTenant(
   prisma: PrismaClient,
   sourceTermId: string,
   targetTermId: string,
-  options: { anonymizeTeachers?: boolean } = {}
+  options: { anonymizeTeachers?: boolean; specializedNameMap?: Map<string, string> } = {}
 ) {
   const source = await prisma.schoolTerm.findUniqueOrThrow({ where: { id: sourceTermId } })
   const target = await prisma.schoolTerm.findUniqueOrThrow({ where: { id: targetTermId } })
@@ -60,6 +121,7 @@ export async function cloneTermWithinTenant(
   const termId = targetTermId
   const oldTermId = sourceTermId
   const anonymizeTeachers = options.anonymizeTeachers ?? false
+  const specializedNameMap = options.specializedNameMap
 
   for (const g of await prisma.grade.findMany({ where: { termId: oldTermId } })) {
     const ng = await prisma.grade.create({ data: { termId, number: g.number } })
@@ -78,14 +140,16 @@ export async function cloneTermWithinTenant(
       where: { teacherId: t.id },
       include: { subject: true },
     })
+    const subjectNames = subs.map((s) => s.subject.name)
     const name = anonymizeTeachers
-      ? anonymizeName(
-          t,
-          homeroom && grade
-            ? { gradeNumber: grade.number, classNumber: homeroom.number }
-            : undefined,
-          subs.map((s) => s.subject.name)
-        )
+      ? (specializedNameMap?.get(t.id) ??
+          anonymizeName(
+            t,
+            homeroom && grade
+              ? { gradeNumber: grade.number, classNumber: homeroom.number }
+              : undefined,
+            subjectNames
+          ))
       : t.name
     const nt = await prisma.teacher.create({ data: { termId, name, type: t.type } })
     map.set(t.id, nt.id)
@@ -275,9 +339,9 @@ export async function cloneTermWithinTenant(
           status: 'NORMAL',
         },
         update: {
-          roomId: rule.roomId,
-          subjectId: rule.subjectId,
-          teacherId: rule.teacherId,
+          ...(rule.roomId !== null ? { roomId: rule.roomId } : {}),
+          ...(rule.subjectId !== null ? { subjectId: rule.subjectId } : {}),
+          ...(rule.teacherId !== null ? { teacherId: rule.teacherId } : {}),
           sourceRuleId: rule.id,
           status: 'NORMAL',
         },
@@ -327,6 +391,22 @@ export async function cloneTenant(
 ) {
   const terms = await prisma.schoolTerm.findMany({ where: { tenantId: sourceTenantId } })
 
+  // 전담 교사 이름을 전 학기에 걸쳐 미리 배정 (동명이인 방지, 동일인 일관성 유지)
+  let specializedNameMap: Map<string, string> | undefined
+  if (anonymizeTeachers) {
+    const allSpecialized: Array<{ id: string; subjectNames: string[] }> = []
+    for (const term of terms) {
+      const teachers = await prisma.teacher.findMany({
+        where: { termId: term.id, type: 'SPECIALIZED' },
+        include: { teacherSubjects: { include: { subject: true } } },
+      })
+      for (const t of teachers) {
+        allSpecialized.push({ id: t.id, subjectNames: t.teacherSubjects.map((ts) => ts.subject.name) })
+      }
+    }
+    specializedNameMap = assignSpecializedNames(allSpecialized)
+  }
+
   for (const term of terms) {
     const nt = await prisma.schoolTerm.create({
       data: {
@@ -337,6 +417,6 @@ export async function cloneTenant(
         endDate: term.endDate,
       },
     })
-    await cloneTermWithinTenant(prisma, term.id, nt.id, { anonymizeTeachers })
+    await cloneTermWithinTenant(prisma, term.id, nt.id, { anonymizeTeachers, specializedNameMap })
   }
 }

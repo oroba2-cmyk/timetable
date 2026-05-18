@@ -219,9 +219,9 @@ export async function createWeeklyRule(
           status: 'NORMAL',
         },
         update: {
-          roomId: opts.roomId ?? null,
-          subjectId: opts.subjectId ?? null,
-          teacherId: opts.teacherId ?? null,
+          ...(opts.roomId !== undefined ? { roomId: opts.roomId } : {}),
+          ...(opts.subjectId !== undefined ? { subjectId: opts.subjectId } : {}),
+          ...(opts.teacherId !== undefined ? { teacherId: opts.teacherId } : {}),
           sourceRuleId: rule.id,
           status: 'NORMAL',
         },
