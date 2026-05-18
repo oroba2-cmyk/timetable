@@ -35,6 +35,7 @@ yarn-error.log*
 !.env.example
 
 # database backups (민감 데이터)
+*.dump
 /backups/*.dump
 /backups/*.sql
 /backups/*.sql.gz
