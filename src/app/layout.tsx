@@ -5,6 +5,8 @@ import { AppShell } from '@/components/AppShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: '특별실·전담 시간표',
   description: '초등학교 특별실·전담수업 시간표 관리',
