@@ -1,13 +1,12 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 
 interface Props {
   weekDates: string[]   // 5 ISO date strings Mon–Fri
   prevWeek: string
   nextWeek: string
-  basePath?: string
 }
 
 function getMondayOfWeek(dateStr: string): string {
@@ -18,8 +17,9 @@ function getMondayOfWeek(dateStr: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function WeekNavigator({ weekDates, prevWeek, nextWeek, basePath = '/schedule' }: Props) {
+export function WeekNavigator({ weekDates, prevWeek, nextWeek }: Props) {
   const router = useRouter()
+  const basePath = usePathname()
 
   const todayMonday = getMondayOfWeek(new Date().toISOString().slice(0, 10))
   const isCurrentWeek = weekDates[0] === todayMonday

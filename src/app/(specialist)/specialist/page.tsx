@@ -105,7 +105,7 @@ export default async function SpecialistPage({
         <ActiveTermBadge year={activeTerm.year} semester={activeTerm.semester} />
       </h1>
 
-      <WeekNavigator weekDates={weekDates} prevWeek={prevWeek} nextWeek={nextWeek} basePath="/specialist" />
+      <WeekNavigator weekDates={weekDates} prevWeek={prevWeek} nextWeek={nextWeek} />
 
       <SpecialistEditor
         termId={activeTerm.id}
