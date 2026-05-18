@@ -7,6 +7,7 @@ interface Props {
   weekDates: string[]   // 5 ISO date strings Mon–Fri
   prevWeek: string
   nextWeek: string
+  basePath?: string
 }
 
 function getMondayOfWeek(dateStr: string): string {
@@ -17,7 +18,7 @@ function getMondayOfWeek(dateStr: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function WeekNavigator({ weekDates, prevWeek, nextWeek }: Props) {
+export function WeekNavigator({ weekDates, prevWeek, nextWeek, basePath = '/schedule' }: Props) {
   const router = useRouter()
 
   const todayMonday = getMondayOfWeek(new Date().toISOString().slice(0, 10))
@@ -25,14 +26,14 @@ export function WeekNavigator({ weekDates, prevWeek, nextWeek }: Props) {
 
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
-    if (val) router.push(`/schedule?week=${val}`)
+    if (val) router.push(`${basePath}?week=${val}`)
   }
 
   const navBtn = 'px-3 py-1.5 border rounded text-sm hover:bg-gray-100 transition-colors'
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <Link href={`/schedule?week=${prevWeek}`} className={navBtn}>← 이전 주</Link>
+      <Link href={`${basePath}?week=${prevWeek}`} className={navBtn}>← 이전 주</Link>
 
       <div className="flex items-center gap-1.5 bg-gray-50 border rounded px-3 py-1.5">
         <input
@@ -46,11 +47,11 @@ export function WeekNavigator({ weekDates, prevWeek, nextWeek }: Props) {
         <span className="text-sm text-gray-600">{weekDates[4].slice(5)}</span>
       </div>
 
-      <Link href={`/schedule?week=${nextWeek}`} className={navBtn}>다음 주 →</Link>
+      <Link href={`${basePath}?week=${nextWeek}`} className={navBtn}>다음 주 →</Link>
 
       {!isCurrentWeek && (
         <Link
-          href="/schedule"
+          href={basePath}
           className="px-3 py-1.5 border rounded text-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors"
         >
           이번 주
